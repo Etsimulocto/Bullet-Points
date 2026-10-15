@@ -36,6 +36,9 @@
     ],
     "weaponNext": [
       "e"
+    ],
+    "catalogToggle": [
+      "F6"
     ]
   },
   "gamepad": {
@@ -65,11 +68,12 @@
       "right": 15
     },
     "weaponPrevButtons": [
-      4
+      6
     ],
     "weaponNextButtons": [
       5
-    ]
+    ],
+    "catalogButton": 4
   },
   "touch": {
     "deadzone": 0.12,
