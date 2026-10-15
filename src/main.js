@@ -101,21 +101,120 @@ let editorDirty = false;
 let editorLoaded = false;
 let editorPath = "";
 
+const weaponList = [{
+  id: "period", name: "Period Pistol", projectileGlyph: ".", damage: 1,
+  shotsPerSecond: 5, projectileSpeed: 560, spreadDegrees: 0, projectilesPerShot: 1, pattern: "single", unlockedByDefault: true
+}];
+let pickupList = [];
 const state = {
-  inverted: false,
-  paused: false,
-  soundEnabled: true,
-  controlScheme: "auto",
-  keys: new Set(),
-  player: { x: 0.5, y: 0.76 },
-  projectiles: [],
-  fireCooldown: 0,
-  aim: { x: 0, y: -1 },
-  gameOver: false,
-  world: { scrollOffset: 0, deathWallY: null, distance: 0 },
-  lastTime: 0,
+  inverted: false, paused: false, soundEnabled: true, controlScheme: "auto", keys: new Set(),
+  player: { x: 0.5, y: 0.76 }, projectiles: [], beams: [], pickups: [], effects: [],
+  fireCooldown: 0, aim: { x: 0, y: -1 }, gameOver: false,
+  health: 3, maxHealth: 3, shields: 0, weaponId: "period", unlockedWeapons: ["period"],
+  pickupSpawnTimer: 3, runTime: 0, pickupMessage: "", pickupMessageTime: 0,
+  gamepadPrevDown: false, gamepadNextDown: false,
+  world: { scrollOffset: 0, deathWallY: null, distance: 0 }, lastTime: 0,
 };
 
+async function loadCombatData() {
+  try {
+    const [weaponResponse, pickupResponse] = await Promise.all([
+      fetch(new URL("../data/weapons.json", import.meta.url)),
+      fetch(new URL("../data/pickups.json", import.meta.url))
+    ]);
+    if (weaponResponse.ok) {
+      const data = await weaponResponse.json();
+      if (Array.isArray(data.weapons) && data.weapons.length) {
+        weaponList.splice(0, weaponList.length, ...data.weapons);
+        state.unlockedWeapons = weaponList.filter(w => w.unlockedByDefault).map(w => w.id);
+        if (!state.unlockedWeapons.length) state.unlockedWeapons = [weaponList[0].id];
+        state.weaponId = state.unlockedWeapons.includes("period") ? "period" : state.unlockedWeapons[0];
+      }
+    }
+    if (pickupResponse.ok) {
+      const data = await pickupResponse.json();
+      if (Array.isArray(data.pickups)) pickupList = data.pickups;
+    }
+  } catch {
+    // Keep the built-in Period Pistol if the editable lists cannot load.
+  }
+}
+function getWeapon(id = state.weaponId) {
+  return weaponList.find(weapon => weapon.id === id) || weaponList[0];
+}
+function cycleWeapon(direction) {
+  const unlocked = weaponList.filter(weapon => state.unlockedWeapons.includes(weapon.id));
+  if (unlocked.length < 2) {
+    state.pickupMessage = "Find a weapon page to unlock more weapons";
+    state.pickupMessageTime = 2;
+    return;
+  }
+  let index = unlocked.findIndex(weapon => weapon.id === state.weaponId);
+  index = (index + direction + unlocked.length) % unlocked.length;
+  state.weaponId = unlocked[index].id;
+  state.pickupMessage = unlocked[index].name;
+  state.pickupMessageTime = 1.8;
+}
+function effectValue(effect, fallback = 1) {
+  return state.effects.filter(item => item.effect === effect).reduce((value, item) => value * item.amount, fallback);
+}
+function sayPickup(message) {
+  state.pickupMessage = message;
+  state.pickupMessageTime = 2.2;
+}
+function collectPickup(pickup) {
+  const item = pickup.data;
+  if (item.effect === "restoreHealth") {
+    const before = state.health;
+    state.health = Math.min(state.maxHealth, state.health + item.amount);
+    sayPickup(state.health > before ? item.name + " +" + (state.health - before) + " HP" : "HEALTH FULL");
+  } else if (item.effect === "addShield") {
+    state.shields += item.amount;
+    sayPickup(item.name + " +" + item.amount);
+  } else if (item.effect === "modifyFireRate" || item.effect === "extraProjectiles" || item.effect === "slowScroll") {
+    state.effects.push({ effect: item.effect, amount: item.amount, remaining: item.durationSeconds });
+    sayPickup(item.name + " · " + item.durationSeconds + "s");
+  } else if (item.effect === "grantWeapon") {
+    const locked = weaponList.filter(weapon => !state.unlockedWeapons.includes(weapon.id));
+    const weapon = item.amount === "random" ? locked[Math.floor(Math.random() * locked.length)] : weaponList.find(entry => entry.id === item.amount);
+    if (weapon) {
+      if (!state.unlockedWeapons.includes(weapon.id)) state.unlockedWeapons.push(weapon.id);
+      state.weaponId = weapon.id;
+      sayPickup("UNLOCKED · " + weapon.name);
+    } else {
+      state.shields += 1;
+      sayPickup("ARSENAL COMPLETE · +1 SHIELD");
+    }
+  } else if (item.effect === "increaseMaxHealth") {
+    state.maxHealth += item.amount;
+    state.health = Math.min(state.maxHealth, state.health + item.amount);
+    sayPickup("MAX HP +" + item.amount);
+  } else if (item.effect === "bonusDistance") {
+    state.world.distance += item.amount;
+    sayPickup("PAGE SKIP · +" + item.amount + "m");
+  } else {
+    sayPickup(item.name || "PICKUP");
+  }
+}
+function shootWeapon(weapon, aim, width, height) {
+  const baseAngle = Math.atan2(aim.y, aim.x);
+  if (weapon.pattern === "beam") {
+    state.beams.push({ x: width * state.player.x, y: height * state.player.y, angle: baseAngle, length: weapon.beamLength || 400, duration: weapon.beamDuration || 0.12, remaining: weapon.beamDuration || 0.12 });
+    return;
+  }
+  const count = Math.max(1, Number(weapon.projectilesPerShot) || 1) + Math.max(0, Math.floor(effectValue("extraProjectiles", 0)));
+  const spread = (Number(weapon.spreadDegrees) || 0) * Math.PI / 180;
+  const speed = Number(weapon.projectileSpeed) || 500;
+  for (let i = 0; i < count; i += 1) {
+    const angle = baseAngle + (count === 1 ? 0 : spread * (i / (count - 1) - 0.5));
+    state.projectiles.push({
+      x: width * state.player.x + Math.cos(angle) * 14,
+      y: height * state.player.y + Math.sin(angle) * 14,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, angle,
+      glyph: weapon.projectileGlyph || ".", damage: Number(weapon.damage) || 1
+    });
+  }
+}
 async function loadControlMap() {
   try {
     const response = await fetch(new URL("../data/controls.json", import.meta.url));
@@ -160,6 +259,18 @@ function readControls() {
   const m=Math.hypot(move.x,move.y); if(m>1) move={x:move.x/m,y:move.y/m};
   const keyAim=useK?{x:keyAxis(kb.aimLeft,kb.aimRight),y:keyAxis(kb.aimUp,kb.aimDown)}:{x:0,y:0};
   const aim=[useT?input.touchAim:null,useG?input.aim:null,keyAim,useK?input.mouseAim:null].find(v=>v&&Math.hypot(v.x,v.y)>.15)||{x:0,y:-1};
+  if (useG && input.pad) {
+    const down = index => Boolean(input.pad.buttons[index]?.pressed);
+    const prev = (controlMap.gamepad.weaponPrevButtons || [4]).some(down);
+    const next = (controlMap.gamepad.weaponNextButtons || [5]).some(down);
+    if (prev && !state.gamepadPrevDown) cycleWeapon(-1);
+    if (next && !state.gamepadNextDown) cycleWeapon(1);
+    state.gamepadPrevDown = prev;
+    state.gamepadNextDown = next;
+  } else {
+    state.gamepadPrevDown = false;
+    state.gamepadNextDown = false;
+  }
   const fire=(useK&&(kb.fire||[]).some(k=>state.keys.has(k)|| (k===" "&&state.keys.has(" "))))||(useK&&input.mouseFire)||(useG&&input.pad&&(controlMap.gamepad.fireButtons||[]).some(i=>input.pad.buttons[i]?.pressed))||(useT&&input.touchFire&&controlMap.touch.fireWhileRightStickHeld);
   return {move,aim,fire};
 }
@@ -275,6 +386,67 @@ function draw() {
     context.fillText("PRESS R TO RESTART", width / 2, height * 0.53);
   }
 }
+cale(pulse, pulse);
+    context.fillStyle = color.paper;
+    context.beginPath();
+    context.arc(0, 0, 14, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = color.accent;
+    context.lineWidth = 2;
+    context.stroke();
+    context.fillStyle = color.accent;
+    context.textAlign = "center";
+    context.font = "bold 16px 'Courier New', monospace";
+    context.fillText(pickup.data.glyph || "?", 0, 5);
+    context.restore();
+  });
+
+  state.projectiles.forEach(shot => {
+    context.save();
+    context.translate(shot.x, shot.y);
+    context.rotate(shot.angle);
+    context.fillStyle = color.accent;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.font = "bold 18px 'Courier New', monospace";
+    context.fillText(shot.glyph, 0, 0);
+    if (shot.glyph === ".") {
+      context.globalAlpha = 0.5;
+      context.fillRect(-9, -1, 5, 2);
+    }
+    context.restore();
+  });
+  state.beams.forEach(beam => {
+    context.save();
+    context.translate(beam.x, beam.y);
+    context.rotate(beam.angle);
+    context.globalAlpha = Math.max(0.15, beam.remaining / beam.duration);
+    context.strokeStyle = color.accent;
+    context.lineWidth = 4;
+    context.beginPath();
+    context.moveTo(8, 0);
+    context.lineTo(beam.length, 0);
+    context.stroke();
+    context.globalAlpha *= 0.55;
+    context.lineWidth = 10;
+    context.beginPath();
+    context.moveTo(8, 0);
+    context.lineTo(beam.length, 0);
+    context.stroke();
+    context.restore();
+  });
+
+  if (state.gameOver) {
+    context.fillStyle = state.inverted ? "rgb(0 0 0 / 72%)" : "rgb(244 240 230 / 82%)";
+    context.fillRect(wallWidth, height * 0.38, width - wallWidth * 2, height * 0.22);
+    context.fillStyle = color.accent;
+    context.font = "bold 22px 'Courier New', monospace";
+    context.fillText("ERASED", width / 2, height * 0.47);
+    context.fillStyle = color.ink;
+    context.font = "12px 'Courier New', monospace";
+    context.fillText("PRESS R TO RESTART", width / 2, height * 0.53);
+  }
+}
 
 function update(time) {
   const dt = Math.min((time - state.lastTime) / 1000 || 0, 0.04);
@@ -283,20 +455,56 @@ function update(time) {
   state.world.deathWallY = height - roomSettings.deathWallHeight;
 
   if (!state.paused && !state.gameOver) {
+    state.runTime += dt;
+    state.effects = state.effects.map(effect => ({ ...effect, remaining: effect.remaining - dt })).filter(effect => effect.remaining > 0);
+    state.pickupMessageTime = Math.max(0, state.pickupMessageTime - dt);
     const controls = readControls();
     state.player.x += controls.move.x * dt * 0.45;
     state.player.y += controls.move.y * dt * 0.45;
-    if (Math.hypot(controls.aim.x,controls.aim.y)>.15) state.aim=controls.aim;
+    if (Math.hypot(controls.aim.x, controls.aim.y) > 0.15) state.aim = controls.aim;
+
+    const scrollScale = effectValue("slowScroll", 1);
+    const scrollStep = roomSettings.scrollSpeed * scrollScale;
+    state.world.scrollOffset += dt * scrollStep;
+    state.world.distance += dt * scrollStep;
+
+    state.pickupSpawnTimer -= dt;
+    if (state.pickupSpawnTimer <= 0 && pickupList.length) {
+      const totalWeight = pickupList.reduce((sum, item) => sum + Math.max(0, Number(item.weight) || 1), 0);
+      let roll = Math.random() * totalWeight;
+      const item = pickupList.find(entry => (roll -= Math.max(0, Number(entry.weight) || 1)) <= 0) || pickupList[0];
+      const margin = Math.min(0.2, roomSettings.wallWidth / Math.max(width, 1) + 0.04);
+      state.pickups.push({ data: item, x: width * (margin + Math.random() * (1 - margin * 2)), y: 18 });
+      state.pickupSpawnTimer = 5 + Math.random() * 4;
+    }
+
     state.fireCooldown -= dt;
-    if(controls.fire&&state.fireCooldown<=0){const mag=Math.hypot(state.aim.x,state.aim.y)||1;state.projectiles.push({x:width*state.player.x,y:height*state.player.y,vx:state.aim.x/mag*440,vy:state.aim.y/mag*440});state.fireCooldown=.16;}
-    state.projectiles=state.projectiles.filter(shot=>{shot.x+=shot.vx*dt;shot.y+=shot.vy*dt;return shot.x>=0&&shot.x<=width&&shot.y>=0&&shot.y<=height;});
+    const weapon = getWeapon();
+    const fireRate = effectValue("modifyFireRate", 1);
+    if (controls.fire && state.fireCooldown <= 0) {
+      shootWeapon(weapon, state.aim, width, height);
+      state.fireCooldown = 1 / Math.max(0.2, (Number(weapon.shotsPerSecond) || 4) * fireRate);
+    }
+    state.projectiles = state.projectiles.filter(shot => {
+      shot.x += shot.vx * dt;
+      shot.y += shot.vy * dt;
+      shot.angle = Math.atan2(shot.vy, shot.vx);
+      return shot.x >= -20 && shot.x <= width + 20 && shot.y >= -20 && shot.y <= height + 20;
+    });
+    state.beams = state.beams.map(beam => ({ ...beam, remaining: beam.remaining - dt })).filter(beam => beam.remaining > 0);
+    const playerX = width * state.player.x, playerY = height * state.player.y;
+    state.pickups = state.pickups.filter(pickup => {
+      pickup.y += dt * scrollStep;
+      if (Math.hypot(pickup.x - playerX, pickup.y - playerY) < 22) {
+        collectPickup(pickup);
+        return false;
+      }
+      return pickup.y < state.world.deathWallY - 10;
+    });
 
     const wallMargin = Math.min(0.18, roomSettings.wallWidth / Math.max(width, 1) + 0.025);
     state.player.x = Math.max(wallMargin, Math.min(1 - wallMargin, state.player.x));
     state.player.y = Math.max(0.08, Math.min(0.98, state.player.y));
-
-    state.world.scrollOffset += dt * roomSettings.scrollSpeed;
-    state.world.distance += dt * roomSettings.scrollSpeed;
     if (height * state.player.y + 10 >= state.world.deathWallY) {
       state.gameOver = true;
       state.paused = true;
@@ -313,6 +521,19 @@ function resetRun() {
   state.world = { scrollOffset: 0, deathWallY: height - roomSettings.deathWallHeight, distance: 0 };
   state.gameOver = false;
   state.projectiles = [];
+  state.beams = [];
+  state.pickups = [];
+  state.effects = [];
+  state.health = 3;
+  state.maxHealth = 3;
+  state.shields = 0;
+  state.unlockedWeapons = weaponList.filter(weapon => weapon.unlockedByDefault).map(weapon => weapon.id);
+  if (!state.unlockedWeapons.length) state.unlockedWeapons = [weaponList[0].id];
+  state.weaponId = state.unlockedWeapons.includes("period") ? "period" : state.unlockedWeapons[0];
+  state.pickupSpawnTimer = 2.5;
+  state.runTime = 0;
+  state.pickupMessage = "";
+  state.pickupMessageTime = 0;
   state.fireCooldown = 0;
   state.paused = dialog.open || !editorPanel.hidden;
   state.keys.clear();
@@ -514,6 +735,11 @@ function saveCurrentRun(slot) {
     inverted: state.inverted,
     soundEnabled: state.soundEnabled,
     controlScheme: state.controlScheme,
+    health: state.health,
+    maxHealth: state.maxHealth,
+    shields: state.shields,
+    weaponId: state.weaponId,
+    unlockedWeapons: [...state.unlockedWeapons],
   };
   try {
     localStorage.setItem(slotKey(slot), JSON.stringify(snapshot));
@@ -545,6 +771,14 @@ function loadRun(slot) {
     state.world = { scrollOffset: 0, deathWallY: height - roomSettings.deathWallHeight, distance: 0 };
   }
   state.gameOver = false;
+  state.health = Number.isFinite(snapshot.health) ? snapshot.health : 3;
+  state.maxHealth = Number.isFinite(snapshot.maxHealth) ? snapshot.maxHealth : 3;
+  state.shields = Number.isFinite(snapshot.shields) ? snapshot.shields : 0;
+  state.unlockedWeapons = Array.isArray(snapshot.unlockedWeapons) ? snapshot.unlockedWeapons.filter(id => weaponList.some(weapon => weapon.id === id)) : weaponList.filter(weapon => weapon.unlockedByDefault).map(weapon => weapon.id);
+  if (!state.unlockedWeapons.length) state.unlockedWeapons = [weaponList[0].id];
+  state.weaponId = state.unlockedWeapons.includes(snapshot.weaponId) ? snapshot.weaponId : state.unlockedWeapons[0];
+  state.pickups = [];
+  state.effects = [];
   state.inverted = Boolean(snapshot.inverted);
   state.soundEnabled = snapshot.soundEnabled !== false;
   state.controlScheme = ["auto","keyboard","gamepad","touch"].includes(snapshot.controlScheme) ? snapshot.controlScheme : "auto";
@@ -673,6 +907,10 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  if (["auto", "keyboard"].includes(state.controlScheme)) {
+    if ((controlMap.keyboard.weaponPrev || ["q"]).includes(key)) { event.preventDefault(); cycleWeapon(-1); return; }
+    if ((controlMap.keyboard.weaponNext || ["e"]).includes(key)) { event.preventDefault(); cycleWeapon(1); return; }
+  }
   if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(key)) event.preventDefault();
   state.keys.add(key);
 });
@@ -729,6 +967,7 @@ applyMenuCopy();
 applyControlScheme();
 applyDeathWallSettings();
 loadControlMap();
+loadCombatData();
 loadWorldSettings();
 resizeCanvas();
 requestAnimationFrame(update);
