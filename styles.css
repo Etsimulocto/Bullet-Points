@@ -75,3 +75,78 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   .slot-actions button { flex: 1; }
   .slot-actions { width: 100%; }
 }
+
+
+/* Side-mounted content editor */
+.topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+body.editor-open {
+  display: grid;
+  grid-template-columns: minmax(0, 780px) minmax(300px, 360px);
+  justify-content: center;
+  align-items: stretch;
+  gap: 16px;
+  padding: 12px;
+}
+body.editor-open .app { width: 100%; min-height: calc(100svh - 24px); margin: 0; padding: 6px; }
+.editor-panel {
+  grid-column: 2;
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  height: calc(100svh - 24px);
+  padding: 14px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+}
+.editor-panel[hidden] { display: none; }
+.editor-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.editor-header h2 { margin: 0; font-size: 21px; }
+.editor-header .eyebrow { margin-top: 2px; }
+.editor-intro, .editor-file-path, .editor-status, .editor-shortcut { margin: 0; font-size: 10px; line-height: 1.45; }
+.editor-panel > label { font-size: 10px; font-weight: bold; letter-spacing: .08em; }
+.editor-panel select, .editor-panel textarea, .editor-actions button {
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+.editor-panel select { width: 100%; padding: 9px; }
+.editor-file-path { opacity: .65; overflow-wrap: anywhere; }
+.editor-panel textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+}
+.editor-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.editor-actions button { min-height: 38px; padding: 7px; cursor: pointer; font-size: 10px; font-weight: bold; }
+.editor-actions button:hover { background: var(--ink); color: var(--paper); }
+.editor-status { min-height: 2.8em; }
+.editor-shortcut { opacity: .6; }
+#editor-toggle { white-space: nowrap; }
+@media (max-width: 900px) {
+  body.editor-open { display: block; padding: 0; }
+  body.editor-open .app { display: none; }
+  .editor-panel:not([hidden]) {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    width: 100%;
+    height: 100svh;
+    padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
+    border: 0;
+    overflow: auto;
+  }
+  .editor-panel textarea { min-height: 42svh; }
+}
