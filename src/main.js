@@ -149,10 +149,11 @@ const weaponList = [{
 let pickupList = [];
 let enemyList = [];
 let horizontalWallWords = ["STONE", "BARRIER", "PARAGRAPH", "BLOCK"];
+let numberHazardList = [];
 const catalogData = { enemies: [], weapons: [], pickups: [], obstacles: [], patterns: [], wordSet: {}, settings: {}, controls: {}, menu: {}, feed: {} };
 const state = {
   inverted: false, paused: false, soundEnabled: true, controlScheme: "auto", fontTheme: "dos", keys: new Set(),
-  player: { x: 0.5, y: 0.76 }, projectiles: [], beams: [], pickups: [], obstacles: [], effects: [],
+  player: { x: 0.5, y: 0.76 }, projectiles: [], beams: [], pickups: [], obstacles: [], numberHazards: [], effects: [],
   fireCooldown: 0, aim: { x: 0, y: -1 }, gameOver: false,
   enemies: [], enemyBullets: [], explosions: [], enemySpawnIndex: 0,
   health: 3, maxHealth: 3, lives: 3, maxLives: 3, score: 0, shields: 0, weaponId: "period", unlockedWeapons: ["period"],
@@ -233,6 +234,7 @@ async function loadCatalogData() {
     if (!data) return;
     catalogData[key] = listKey ? (Array.isArray(data[listKey]) ? data[listKey] : []) : data;
   });
+  numberHazardList = catalogData.obstacles.filter(item => item?.type === "number");
   renderCatalog();
 }
 
@@ -241,6 +243,7 @@ async function loadStartupContent() {
   catalogData.enemies = enemyList;
   catalogData.weapons = weaponList;
   catalogData.pickups = pickupList;
+  numberHazardList = (catalogData.obstacles || []).filter(item => item?.type === "number");
   renderCatalog();
 }
 
@@ -293,8 +296,9 @@ function renderCatalog() {
     `DMG ${weapon.damage ?? "?"} · ${weapon.shotsPerSecond ?? "?"}/s · SPEED ${weapon.projectileSpeed ?? "BEAM"} · SPREAD ${weapon.spreadDegrees ?? 0}° · SHOTS ${weapon.projectilesPerShot ?? 1} · ${String(weapon.pattern || "single").toUpperCase()}`);
   addCatalogSection("PICKUPS", pickups, pickup =>
     `${pickup.glyph || "?"} · ${pickup.effect || "?"} × ${pickup.amount ?? 1} · ${pickup.durationSeconds || 0}s · WEIGHT ${pickup.weight ?? "?"} · ${pickup.description || ""}`);
-  addCatalogSection("OBSTACLES", obstacles, obstacle =>
-    `${obstacle.wordSet || "wall"} · ${obstacle.collision || "solid"} · HP ${obstacle.health ?? 0} · BREAKS INTO LETTERS ${obstacle.breaksIntoLetters ? "YES" : "NO"}`);
+  addCatalogSection("OBSTACLES & EQUATIONS", obstacles, obstacle => obstacle.type === "number"
+    ? `${obstacle.equation || obstacle.name} · ${obstacle.behavior} · RANGE ${obstacle.triggerRadius}px · SUCTION ${obstacle.suctionSpeed ?? 0} · HOLD ${obstacle.holdSeconds ?? 0}s · SLAM ${obstacle.slamSpeed ?? 0} · LAUNCH ${obstacle.launchSpeed ?? 0}`
+    : `${obstacle.wordSet || "wall"} · ${obstacle.collision || "solid"} · HP ${obstacle.health ?? 0} · BREAKS INTO LETTERS ${obstacle.breaksIntoLetters ? "YES" : "NO"}`);
   addCatalogSection("SPAWN PATTERNS", patterns, pattern =>
     `${pattern.description || ""} · ${(pattern.entries || []).map(entry => `${entry.count || 1}× ${entry.type}:${entry.id} (gap ${entry.spacing || 0})`).join(" · ")}`);
 
@@ -329,7 +333,10 @@ function refreshCatalogFromEditor() {
   if (editorPath.endsWith("/enemies.json")) catalogData.enemies = data.enemies || [];
   else if (editorPath.endsWith("/weapons.json")) catalogData.weapons = data.weapons || [];
   else if (editorPath.endsWith("/pickups.json")) catalogData.pickups = data.pickups || [];
-  else if (editorPath.endsWith("/obstacles.json")) catalogData.obstacles = data.obstacles || [];
+  else if (editorPath.endsWith("/obstacles.json")) {
+    catalogData.obstacles = data.obstacles || [];
+    numberHazardList = catalogData.obstacles.filter(item => item?.type === "number");
+  }
   else if (editorPath.endsWith("/spawn-patterns.json")) catalogData.patterns = data.patterns || [];
   else if (editorPath.includes("/word-sets/")) catalogData.wordSet = data;
   else if (editorPath.endsWith("/settings.json")) catalogData.settings = data;
@@ -914,6 +921,38 @@ function draw() {
     context.restore();
   });
 
+  state.numberHazards.forEach(hazard => {
+    const pulse = 1 + Math.sin(state.runTime * 5 + hazard.x * 0.02) * 0.08;
+    const colorCode = hazard.data.color || color.accent;
+    const equation = String(hazard.data.equation || hazard.data.name || "1 + 1 = ?");
+    context.save();
+    context.translate(hazard.x, hazard.y);
+    context.rotate(Math.sin(state.runTime * 2 + hazard.x) * 0.045);
+    context.scale(pulse, pulse);
+    context.strokeStyle = colorCode;
+    context.fillStyle = color.paper;
+    context.lineWidth = 3;
+    context.setLineDash([5, 4]);
+    context.beginPath();
+    context.arc(0, 0, 34 + Math.sin(state.runTime * 7) * 3, 0, Math.PI * 2);
+    context.stroke();
+    context.setLineDash([]);
+    context.fillRect(-48, -20, 96, 40);
+    context.strokeRect(-48, -20, 96, 40);
+    context.fillStyle = color.ink;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    const fontSize = Math.max(9, Math.min(17, 260 / equation.length));
+    setCanvasFont(fontSize, "bold");
+    context.fillText(equation, 0, 0, 88);
+    if (hazard.phase !== "idle" && hazard.phase !== "cooldown") {
+      context.fillStyle = colorCode;
+      setCanvasFont(8, "bold");
+      context.fillText(hazard.phase.toUpperCase() + " · " + (hazard.bounces || 0), 0, 29);
+    }
+    context.restore();
+  });
+
   state.pickups.forEach(pickup => {
     const pulse = 1 + Math.sin(state.runTime * 6 + pickup.y * 0.03) * 0.08;
     context.save();
@@ -1105,6 +1144,10 @@ function update(time) {
     const wallMargin = Math.min(0.18, roomSettings.wallWidth / Math.max(width, 1) + 0.025);
     const minX = wallMargin, maxX = 1 - wallMargin;
     const minY = 0.08, maxY = Math.min(0.98, (state.world.deathWallY - 16) / height);
+    state.numberHazards = state.numberHazards.filter(hazard => hazard.y < state.world.deathWallY + 50);
+    const hazardControl = updateNumberHazards(dt, width, height, scrollDelta, nextPlayerX, nextPlayerY, minX, maxX, minY, maxY);
+    nextPlayerX = hazardControl.x;
+    nextPlayerY = hazardControl.y;
     nextPlayerX = Math.max(minX, Math.min(maxX, nextPlayerX));
     nextPlayerY = Math.max(minY, Math.min(maxY, nextPlayerY));
     const nextPx = nextPlayerX * width, nextPy = nextPlayerY * height;
@@ -1196,6 +1239,7 @@ function resetRun() {
   state.enemySpawnIndex = 0;
   state.pickups = [];
   state.obstacles = [];
+  state.numberHazards = [];
   state.effects = [];
   state.health = 3;
   state.maxHealth = 3;
@@ -1259,6 +1303,7 @@ function spawnWorldDrop(width) {
   const roomWidth = Math.max(80, width - roomSettings.wallWidth * 2 - 24);
   const enemyChance = enemyList.length ? 0.3 : 0;
   const pickupChance = pickupList.length ? 0.35 : 0;
+  const numberHazardChance = numberHazardList.length ? 0.2 : 0;
   const roll = Math.random();
   if (roll < enemyChance) {
     spawnEnemy(width);
@@ -1270,6 +1315,11 @@ function spawnWorldDrop(width) {
     const item = pickupList.find(entry => (itemRoll -= Math.max(0, Number(entry.weight) || 1)) <= 0) || pickupList[0];
     const left = roomSettings.wallWidth + 12;
     state.pickups.push({ data: item, x: left + Math.random() * roomWidth, y: -20 });
+    return;
+  }
+  if (roll < enemyChance + pickupChance + numberHazardChance) {
+    const data = numberHazardList[Math.floor(Math.random() * numberHazardList.length)];
+    spawnNumberHazard(data, width, Math.max(80, width - roomSettings.wallWidth * 2), -42);
     return;
   }
 
@@ -1285,6 +1335,175 @@ function spawnWorldDrop(width) {
   while (context.measureText(label).width < barrierWidth - 18) label += " · " + word;
   state.obstacles.push({ word, label, x, y: -28, width: barrierWidth, height: 26 });
   state.nextWallSide = gapSide === "left" ? "right" : "left";
+}
+
+function spawnNumberHazard(data, width, height, y = -42, x = null) {
+  if (!data || state.numberHazards.length >= 5) return false;
+  const left = roomSettings.wallWidth + 24;
+  const right = Math.max(left + 1, width - roomSettings.wallWidth - 24);
+  const hazardX = Number.isFinite(x) ? x : left + Math.random() * (right - left);
+  state.numberHazards.push({
+    id: data.id || "equation-" + Math.random().toString(36).slice(2, 7),
+    data: { ...data },
+    x: hazardX,
+    y,
+    previousY: y,
+    phase: "idle",
+    timer: 0,
+    cooldown: 0,
+    velocityX: 0,
+    velocityY: 0,
+    direction: "",
+    bounces: 0
+  });
+  return true;
+}
+
+function updateNumberHazards(dt, width, height, scrollDelta, playerX, playerY, minX, maxX, minY, maxY) {
+  let targetX = playerX;
+  let targetY = playerY;
+  const activePhases = new Set(["suction", "hold", "slam", "pinned", "pinball", "repulse"]);
+  let active = state.numberHazards.find(hazard => activePhases.has(hazard.phase));
+
+  state.numberHazards = state.numberHazards.filter(hazard => {
+    hazard.previousY = hazard.y;
+    hazard.y += scrollDelta;
+    if (hazard.y > state.world.deathWallY + 50) return false;
+    const data = hazard.data || {};
+    const behavior = data.behavior || "suction-hold";
+    hazard.cooldown = Math.max(0, hazard.cooldown - dt);
+
+    if (hazard.phase === "cooldown") {
+      hazard.timer -= dt;
+      if (hazard.timer <= 0) hazard.phase = "idle";
+      return true;
+    }
+    if (hazard.phase === "idle") {
+      if (active || hazard.cooldown > 0) return true;
+      const distance = Math.hypot(hazard.x - targetX * width, hazard.y - targetY * height);
+      if (distance > (Number(data.triggerRadius) || 150)) return true;
+      active = hazard;
+      hazard.phase = behavior === "repulsor" ? "repulse" : "suction";
+      hazard.timer = Number(data.suctionSeconds) || 0.7;
+      sayPickup((data.equation || data.name || "EQUATION") + " · " + (behavior === "repulsor" ? "REPEL" : "GRAVITY WELL"));
+    }
+    if (hazard !== active) return true;
+
+    const px = targetX * width, py = targetY * height;
+    const dx = hazard.x - px, dy = hazard.y - py;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    const clampX = value => Math.max(minX, Math.min(maxX, value));
+    const clampY = value => Math.max(minY, Math.min(maxY, value));
+
+    if (hazard.phase === "suction") {
+      const speed = Math.max(0, Number(data.suctionSpeed) || 260);
+      const step = Math.min(distance, speed * dt);
+      targetX = clampX(targetX + dx / distance * step / width);
+      targetY = clampY(targetY + dy / distance * step / height);
+      hazard.timer -= dt;
+      if (distance <= (Number(data.captureRadius) || 28) || hazard.timer <= 0) {
+        hazard.phase = "hold";
+        hazard.timer = Math.max(0.2, Number(data.holdSeconds) || 1);
+        hazard.anchorX = clampX(hazard.x / width);
+        hazard.anchorY = clampY((hazard.y - 8) / height);
+      }
+    } else if (hazard.phase === "hold") {
+      targetX = hazard.anchorX;
+      targetY = hazard.anchorY;
+      hazard.timer -= dt;
+      if (hazard.timer <= 0) {
+        if (behavior === "wall-slam") {
+          const dirs = Array.isArray(data.directions) && data.directions.length ? data.directions : ["left", "right", "up", "down"];
+          hazard.direction = dirs[Math.floor(Math.random() * dirs.length)];
+          hazard.phase = "slam";
+        } else if (behavior === "pinball" || behavior === "suction-pinball" || behavior === "wall-slam") {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = Math.max(200, Number(data.launchSpeed) || 520);
+          hazard.velocityX = Math.cos(angle) * speed;
+          hazard.velocityY = Math.sin(angle) * speed;
+          hazard.timer = Math.max(0.4, Number(data.pinballSeconds) || 2);
+          hazard.phase = "pinball";
+          hazard.bounces = 0;
+        } else {
+          hazard.phase = "cooldown";
+          hazard.timer = Math.max(0.5, Number(data.cooldownSeconds) || 2.5);
+        }
+      }
+    } else if (hazard.phase === "slam") {
+      const destination = {
+        left: { x: minX, y: targetY },
+        right: { x: maxX, y: targetY },
+        up: { x: targetX, y: minY },
+        down: { x: targetX, y: maxY }
+      }[hazard.direction] || { x: minX, y: targetY };
+      const dxNorm = destination.x - targetX, dyNorm = destination.y - targetY;
+      const distPx = Math.hypot(dxNorm * width, dyNorm * height);
+      const step = Math.max(100, Number(data.slamSpeed) || 620) * dt;
+      if (distPx <= step + 2) {
+        targetX = destination.x;
+        targetY = destination.y;
+        hazard.phase = "pinned";
+        hazard.timer = Math.max(0.3, Number(data.wallHoldSeconds) || 1.4);
+        sayPickup("SLAMMED " + hazard.direction.toUpperCase() + " · HOLD ON");
+      } else {
+        targetX = clampX(targetX + dxNorm / distPx * step / width);
+        targetY = clampY(targetY + dyNorm / distPx * step / height);
+      }
+    } else if (hazard.phase === "pinned") {
+      if (hazard.direction === "left") targetX = minX;
+      if (hazard.direction === "right") targetX = maxX;
+      if (hazard.direction === "up") targetY = minY;
+      if (hazard.direction === "down") targetY = maxY;
+      hazard.timer -= dt;
+      if (hazard.timer <= 0) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.max(200, Number(data.launchSpeed) || 520);
+        hazard.velocityX = Math.cos(angle) * speed;
+        hazard.velocityY = Math.sin(angle) * speed;
+        hazard.timer = Math.max(0.4, Number(data.pinballSeconds) || 2);
+        hazard.phase = "pinball";
+        sayPickup("EQUATION RELEASE · PINBALL!");
+      }
+    } else if (hazard.phase === "pinball") {
+      hazard.timer -= dt;
+      let nextPx = px + hazard.velocityX * dt;
+      let nextPy = py + hazard.velocityY * dt;
+      if (nextPx < minX * width) { nextPx = minX * width; hazard.velocityX = Math.abs(hazard.velocityX); hazard.bounces += 1; }
+      if (nextPx > maxX * width) { nextPx = maxX * width; hazard.velocityX = -Math.abs(hazard.velocityX); hazard.bounces += 1; }
+      if (nextPy < minY * height) { nextPy = minY * height; hazard.velocityY = Math.abs(hazard.velocityY); hazard.bounces += 1; }
+      if (nextPy > maxY * height) { nextPy = maxY * height; hazard.velocityY = -Math.abs(hazard.velocityY); hazard.bounces += 1; }
+      const struckWall = state.effects.some(effect => effect.effect === "wordWall")
+        ? null
+        : state.obstacles.find(obstacle => obstacleContainsPoint(nextPx, nextPy, obstacle));
+      if (struckWall) {
+        const hitX = obstacleContainsPoint(nextPx, py, struckWall);
+        const hitY = obstacleContainsPoint(px, nextPy, struckWall);
+        if (hitX || !hitY) hazard.velocityX *= -1;
+        if (hitY || !hitX) hazard.velocityY *= -1;
+        nextPx = px;
+        nextPy = py;
+        hazard.bounces += 1;
+      }
+      targetX = clampX(nextPx / width);
+      targetY = clampY(nextPy / height);
+      if (hazard.timer <= 0) {
+        hazard.phase = "cooldown";
+        hazard.timer = Math.max(0.5, Number(data.cooldownSeconds) || 2.5);
+      }
+    } else if (hazard.phase === "repulse") {
+      const speed = Math.max(100, Number(data.suctionSpeed) || 340);
+      const step = Math.min(Math.max(0, (Number(data.triggerRadius) || 150) - distance), speed * dt);
+      targetX = clampX(targetX - dx / distance * step / width);
+      targetY = clampY(targetY - dy / distance * step / height);
+      hazard.timer -= dt;
+      if (hazard.timer <= 0) {
+        hazard.phase = "cooldown";
+        hazard.timer = Math.max(0.5, Number(data.cooldownSeconds) || 2.5);
+      }
+    }
+    return true;
+  });
+  return { x: targetX, y: targetY };
 }
 
 function obstacleContainsPoint(x, y, obstacle, obstacleY = obstacle.y) {
@@ -1524,6 +1743,7 @@ function spawnEditorItem(kind, item, index, total, width, height) {
     });
     return true;
   }
+  if (kind === "obstacles" && item.type === "number") return spawnNumberHazard(item, width, height, y, x);
   if (kind === "obstacles" || kind === "words") {
     spawnTestObstacle(item.name || item.word || item.id, width, y, index);
     return true;
@@ -1563,7 +1783,7 @@ function spawnEditorSelection(all = false) {
       ["enemies", enemyList],
       ["pickups", pickupList],
       ["weapons", weaponList],
-      ["obstacles", ["STONE", "BLOCK", "LOCK", "GATE"].map((name, id) => ({ id: String(id), name }))],
+      ["obstacles", catalogData.obstacles.length ? catalogData.obstacles : ["STONE", "BLOCK", "LOCK", "GATE"].map((name, id) => ({ id: String(id), name }))],
       ["words", horizontalWallWords.slice(0, 10).map((name, id) => ({ id: String(id), name }))]
     ];
     groups.forEach(([kind, items]) => items.forEach((item, index) => {
@@ -1925,6 +2145,7 @@ function loadRun(slot) {
   state.weaponId = state.unlockedWeapons.includes(snapshot.weaponId) ? snapshot.weaponId : state.unlockedWeapons[0];
   state.pickups = [];
   state.obstacles = [];
+  state.numberHazards = [];
   state.worldSpawnTimer = 1.5;
   state.nextWallSide = "left";
   state.effects = [];
