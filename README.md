@@ -2,7 +2,7 @@
 
 An experimental, word-driven endless dungeon crawler and bullet-hell game.
 
-The playfield scrolls upward through a dungeon made from words. The player runs, dodges, and shoots while a kill wall rises from below. The words can form walls, doors, hazards, enemies, and pickups.
+The playfield scrolls upward through a dungeon made from words. The player runs, dodges, and shoots while a fixed two-line kill wall marks the bottom edge. The words can form walls, doors, hazards, enemies, and pickups.
 
 ## Project status
 
