@@ -21,7 +21,7 @@ Open `http://localhost:8080` in a browser. To test from a phone on the same Wi-F
 ## Current structure
 
 - `index.html`, `styles.css` — page shell and paper-like presentation
-- `src/main.js` — canvas startup and keyboard movement scaffold
+- `src/main.js` — canvas game loop and keyboard, gamepad, mouse, and touch input
 - `data/settings.json` — colors, scrolling, player, and display settings
 - `data/controls.json` — keyboard, standard gamepad, and touch bindings
 - `data/weapons.json` — weapon list and tuning values
@@ -47,9 +47,9 @@ Press **F8** or click **EDITOR [F8]** to open the side editor. Choose a JSON fil
 
 Open **Pause / Settings** to pause movement, resume, restart the current scaffold run, invert the ink, and choose a control scheme. Three save slots store the current scaffold state in this browser's local storage. They are local to this browser/device and are not cloud saves.
 
-The current scaffold save includes player position, room scroll position, wall position, and settings. The save format can grow when real dungeon progress and inventory are implemented. Sound remains a placeholder. Keyboard, gamepad, and dual-stick controls are wired into movement and test shots. Menu wording is editable in `data/menu.json`.
+The current scaffold save includes player position, room scroll position, wall position, and settings. The save format can grow when real dungeon progress and inventory are implemented. Sound remains a placeholder. Keyboard, gamepad, mouse, and dual-stick controls are wired into movement and visible test shots. The test shots are a controls check; enemy combat is not connected yet. Menu wording is editable in `data/menu.json`.
 
-## Controls planned
+## Controls
 
 - Keyboard: WASD or arrows to move; IJKL or mouse to aim; Space or mouse click to fire
 - Gamepad: left stick or D-pad to move; right stick to aim; A or RT to fire
