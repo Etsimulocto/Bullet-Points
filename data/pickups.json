@@ -79,6 +79,47 @@
       "amount": 250,
       "durationSeconds": 0,
       "weight": 7
+    },
+    {
+      "id": "speed-boost",
+      "name": "HOTKEY HASTE",
+      "description": "Move faster for seven seconds.",
+      "glyph": "»",
+      "effect": "speedBoost",
+      "amount": 1.7,
+      "durationSeconds": 7,
+      "weight": 10
+    },
+    {
+      "id": "radial-fire",
+      "name": "ASTERISK STORM",
+      "description": "Auto-fire in every direction for eight seconds.",
+      "glyph": "✳",
+      "effect": "radialFire",
+      "amount": 12,
+      "intervalSeconds": 0.9,
+      "durationSeconds": 8,
+      "weight": 8
+    },
+    {
+      "id": "word-wall",
+      "name": "BRACKET FORTRESS",
+      "description": "A protective word-wall blocks hazards for six seconds.",
+      "glyph": "[ ]",
+      "effect": "wordWall",
+      "amount": 1,
+      "durationSeconds": 6,
+      "weight": 8
+    },
+    {
+      "id": "clones",
+      "name": "COPY / PASTE",
+      "description": "Split into a three-player firing formation for ten seconds.",
+      "glyph": "@@@",
+      "effect": "clones",
+      "amount": 2,
+      "durationSeconds": 10,
+      "weight": 7
     }
   ]
 }
