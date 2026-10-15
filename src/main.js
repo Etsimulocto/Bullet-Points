@@ -925,8 +925,8 @@ function draw() {
     context.fillStyle = color.ink;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    setCanvasFont(14, "bold");
-    context.fillText(obstacle.label, obstacle.x + obstacle.width / 2, obstacle.y);
+    setCanvasFont(16, "bold");
+    context.fillText(obstacle.label, obstacle.x + obstacle.width / 2, obstacle.y, Math.max(24, obstacle.width - 12));
     context.restore();
   });
 
@@ -940,8 +940,8 @@ function draw() {
     context.fillStyle = color.ink;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    setCanvasFont(Math.max(9, Math.min(14, block.size * 0.32)), "bold");
-    context.fillText("BLOCK", block.x, block.y, block.size - 4);
+    setCanvasFont(Math.max(14, Math.min(18, block.size * 0.30)), "bold");
+    context.fillText(block.label || "BLOCK", block.x, block.y, block.size - 8);
     if (block.sliding) { context.fillStyle = "#d97706"; setCanvasFont(9, "bold"); context.fillText("↔", block.x, block.y + block.size / 2 + 8); }
     context.restore();
   });
@@ -1331,14 +1331,14 @@ function spawnStoneRow(width,y,gapSide,gapFraction=.28,word="STONE",setId=""){
   const gapWidth=Math.max(72,Math.min(roomWidth*.38,roomWidth*gapFraction)), wallWidth=roomWidth-gapWidth;
   const kind=word==="GATE"?"gate":word==="LOCK"?"lock":"stone";
   const parts=gapSide==="center"?[{x:left,width:wallWidth/2},{x:left+wallWidth/2+gapWidth,width:wallWidth/2}]:[{x:gapSide==="left"?left+gapWidth:left,width:wallWidth}];
-  return parts.filter(p=>p.width>=52).map(p=>{const o={id:(setId||"wall")+"-"+Math.random().toString(36).slice(2,7),kind,word,label:word,x:p.x,y,width:p.width,height:28,previousY:y,setId};state.obstacles.push(o);return o;});
+  return parts.filter(p=>p.width>=52).map(p=>{setCanvasFont(16,"bold");let label=word;while(context.measureText(label).width<p.width-24&&label.length<180)label+=" · "+word;const o={id:(setId||"wall")+"-"+Math.random().toString(36).slice(2,7),kind,word,label,x:p.x,y,width:p.width,height:28,previousY:y,setId};state.obstacles.push(o);return o;});
 }
 function spawnLockToken(x,y,setId=""){
   const width=44,height=36,o={id:(setId||"lock")+"-token-"+Math.random().toString(36).slice(2,7),kind:"lock",word:"LOCK",label:"LOCK",x:x-width/2,y,width,height,previousY:y,setId};
   state.obstacles.push(o);return o;
 }
 function spawnFallingBlock(data,width,x,y,setId=""){
-  const size=Math.max(28,Math.min(54,Number(data?.size)||38)),left=roomSettings.wallWidth+12+size/2,right=Math.max(left+1,width-roomSettings.wallWidth-12-size/2);
+  const size=Math.max(48,Math.min(68,Number(data?.size)||60)),left=roomSettings.wallWidth+12+size/2,right=Math.max(left+1,width-roomSettings.wallWidth-12-size/2);
   const b={id:(data?.id||"falling-block")+"-"+Math.random().toString(36).slice(2,7),kind:"block",label:data?.name||"BLOCK",x:Math.max(left,Math.min(right,x)),y,previousX:x,previousY:y,width:size,height:size,size,fallSpeed:Math.max(40,Number(data?.fallSpeed)||95),gravity:Math.max(0,Number(data?.gravity)||50),slideSpeed:Math.max(60,Number(data?.slideSpeed)||190),slideDirection:Math.random()<.5?-1:1,vx:0,sliding:false,supportId:"",setId};
   b.previousX=b.x;state.fallingBlocks.push(b);return b;
 }
