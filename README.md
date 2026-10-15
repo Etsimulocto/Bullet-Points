@@ -38,6 +38,12 @@ Open `http://localhost:8080` in a browser. To test from a phone on the same Wi-F
 
 For normal content changes, edit the matching JSON file under `data/`. For example, change words in `data/word-sets/default.json`, weapon tuning in `data/weapons.json`, or menu text in `data/menu.json`. Keep JSON syntax valid. The editor UI and game-side loading/behavior still need to be implemented.
 
+## Pause menu and save slots
+
+Open **Pause / Settings** to pause movement, resume, restart the current scaffold run, invert the ink, and choose a control scheme. Three save slots store the current scaffold state in this browser's local storage. They are local to this browser/device and are not cloud saves.
+
+The current scaffold save includes player position and settings. The save format can grow when real dungeon progress and inventory are implemented. Sound and dual-stick choices are settings placeholders until their game systems are added. Menu wording is editable in `data/menu.json`.
+
 ## Controls planned
 
 - Keyboard: WASD or arrow keys to move; mouse/keyboard to aim and fire
