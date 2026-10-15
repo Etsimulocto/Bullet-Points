@@ -1512,6 +1512,7 @@ async function loadEditorFile(path, allowDiscard = false) {
         editorText.value = draft;
         setEditorStatus("Loaded your browser-local draft. Save it as a file when ready.");
         renderEnemyTuner();
+        renderSpawnTools();
         try { refreshEnemyRosterFromEditor(JSON.parse(draft)); } catch {}
         editorLoaded = true;
         return;
@@ -1532,12 +1533,14 @@ async function loadEditorFile(path, allowDiscard = false) {
         : "Loaded the updated pickup list. Your old pickup draft is backed up in this browser."
       : "Loaded the repository version.");
     renderEnemyTuner();
+    renderSpawnTools();
     if (path === "../data/enemies.json") refreshEnemyRosterFromEditor(JSON.parse(data));
     editorLoaded = true;
   } catch {
     editorText.value = "";
     setEditorStatus("Could not load this file. Run the game through the local web server.");
     renderEnemyTuner();
+    renderSpawnTools();
   }
 }
 
@@ -1836,6 +1839,7 @@ editorCloseButton.addEventListener("click", () => toggleEditor(false));
 editorFileSelect.addEventListener("change", async () => {
   await loadEditorFile(editorFileSelect.value);
   renderEnemyTuner();
+  renderSpawnTools();
 });
 editorText.addEventListener("input", () => {
   editorDirty = true;
@@ -1848,8 +1852,11 @@ editorText.addEventListener("input", () => {
       if (enemy) renderEnemyPreview(enemy);
     } catch {}
   }
+  renderSpawnTools();
 });
 enemyTunerSelect.addEventListener("change", renderEnemyTuner);
+spawnSelectedButton.addEventListener("click", () => spawnEditorSelection(false));
+spawnAllButton.addEventListener("click", () => spawnEditorSelection(true));
 editorValidateButton.addEventListener("click", () => {
   if (parsedEditorData() !== null) setEditorStatus("JSON is valid.");
 });
