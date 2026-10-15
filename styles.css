@@ -8,18 +8,70 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: var(--paper); color: var(--ink); }
 body { min-height: 100svh; }
-button { font: inherit; }
+button, input { font: inherit; }
+button { color: inherit; }
 .app { min-height: 100svh; width: min(100%, 780px); margin: auto; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .eyebrow { margin: 0 0 4px; color: var(--accent); font-size: 11px; letter-spacing: .14em; }
 h1 { margin: 0; font-size: clamp(24px, 7vw, 42px); letter-spacing: -.06em; }
-#invert-button { border: 2px solid currentColor; border-radius: 0; padding: 10px 12px; color: inherit; background: transparent; cursor: pointer; }
+.outline-button, .primary-button, .danger-button, .icon-button, .slot-actions button {
+  border: 2px solid currentColor;
+  border-radius: 0;
+  padding: 10px 12px;
+  background: transparent;
+  cursor: pointer;
+}
+.outline-button[aria-pressed="true"], .primary-button { background: var(--ink); color: var(--paper); }
 .stage { position: relative; flex: 1; min-height: 56svh; overflow: hidden; border: 2px solid var(--ink); background: var(--paper); }
 #game { display: block; width: 100%; height: 100%; }
 .stage-label { position: absolute; left: 12px; bottom: 10px; padding: 4px 6px; font-size: 10px; letter-spacing: .08em; background: var(--paper); color: var(--ink); }
 footer { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; opacity: .75; }
+
+dialog {
+  width: min(620px, calc(100vw - 24px));
+  max-height: min(90svh, 820px);
+  padding: 20px;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 8px 8px 0 color-mix(in srgb, var(--ink) 28%, transparent);
+  overflow: auto;
+}
+dialog::backdrop { background: rgb(15 14 12 / 72%); }
+.dialog-header, .section-title-row, .setting-row, .dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dialog-header { margin-bottom: 16px; }
+.dialog-header h2 { margin: 0; font-size: clamp(20px, 5vw, 28px); }
+.icon-button { width: 42px; height: 42px; padding: 0; font-size: 28px; line-height: 1; }
+.primary-button { width: 100%; font-weight: bold; }
+.menu-section { margin-top: 20px; padding-top: 15px; border-top: 1px solid color-mix(in srgb, var(--ink) 35%, transparent); }
+.menu-section h3 { margin: 0 0 10px; font-size: 13px; letter-spacing: .08em; }
+.setting-row { min-height: 46px; gap: 10px; }
+.setting-row small, .choice-row small, .section-title-row small { display: block; margin-top: 3px; font-size: 10px; opacity: .68; }
+.setting-row input[type="checkbox"], .choice-row input { accent-color: var(--accent); width: 18px; height: 18px; }
+.choice-row { display: flex; align-items: center; min-height: 40px; gap: 10px; cursor: pointer; }
+.save-slots { display: grid; gap: 8px; }
+.save-slot { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px; border: 1px solid color-mix(in srgb, var(--ink) 35%, transparent); }
+.slot-title { margin: 0; font-size: 12px; font-weight: bold; }
+.slot-detail { margin: 4px 0 0; font-size: 10px; opacity: .7; }
+.slot-actions { display: flex; gap: 6px; }
+.slot-actions button { padding: 7px 9px; font-size: 10px; }
+.slot-actions button:disabled { opacity: .4; cursor: not-allowed; }
+.dialog-footer { align-items: flex-end; margin-top: 18px; }
+#menu-status { min-height: 1.3em; margin: 0; font-size: 11px; }
+.danger-button { border-color: var(--accent); color: var(--accent); font-size: 11px; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 520px) {
   .app { padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); gap: 10px; }
   .stage { min-height: 66svh; }
   footer { flex-direction: column; }
+  dialog { padding: 15px; }
+  .save-slot { grid-template-columns: 1fr; }
+  .slot-actions button { flex: 1; }
+  .slot-actions { width: 100%; }
 }
