@@ -1446,8 +1446,8 @@ function updateNumberHazards(dt, width, height, scrollDelta, playerX, playerY, m
         hazard.timer = Math.max(0.3, Number(data.wallHoldSeconds) || 1.4);
         sayPickup("SLAMMED " + hazard.direction.toUpperCase() + " · HOLD ON");
       } else {
-        targetX = clampX(targetX + dxNorm / distPx * step / width);
-        targetY = clampY(targetY + dyNorm / distPx * step / height);
+        targetX = clampX(targetX + dxNorm * step / distPx);
+        targetY = clampY(targetY + dyNorm * step / distPx);
       }
     } else if (hazard.phase === "pinned") {
       if (hazard.direction === "left") targetX = minX;
