@@ -1,0 +1,36 @@
+{
+  "obstacles": [
+    {
+      "id": "stone-wall",
+      "name": "STONE",
+      "wordSet": "walls",
+      "collision": "solid",
+      "health": 3,
+      "breaksIntoLetters": true
+    },
+    {
+      "id": "block",
+      "name": "BLOCK",
+      "wordSet": "walls",
+      "collision": "solid",
+      "health": 2,
+      "breaksIntoLetters": false
+    },
+    {
+      "id": "locked-gate",
+      "name": "LOCK",
+      "wordSet": "doors",
+      "collision": "solid",
+      "health": 1,
+      "requiresKey": true
+    },
+    {
+      "id": "open-gate",
+      "name": "GATE",
+      "wordSet": "doors",
+      "collision": "passable",
+      "health": 0,
+      "requiresKey": false
+    }
+  ]
+}
