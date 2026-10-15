@@ -1,0 +1,21 @@
+{
+  "colors": {
+    "paper": "#f4f0e6",
+    "ink": "#191919",
+    "accent": "#d84b3e",
+    "invertEnabled": true
+  },
+  "world": {
+    "scrollSpeed": 42,
+    "killWallSpeed": 30,
+    "spawnInterval": 1.4
+  },
+  "player": {
+    "startingHealth": 3,
+    "movementSpeed": 240
+  },
+  "display": {
+    "orientation": "portrait",
+    "showTouchControls": "auto"
+  }
+}
