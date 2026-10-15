@@ -12,7 +12,7 @@
 :root[data-game-font="arcade"] { --game-font-stack: "Arial Black", Impact, "DejaVu Sans Mono", monospace; --game-letter-spacing: .035em; }
 :root[data-game-font="arcade"] body { font-weight: 700; }
 html, body { margin: 0; min-height: 100%; background: var(--paper); color: var(--ink); font-family: var(--game-font-stack); letter-spacing: var(--game-letter-spacing); }
-body { min-height: 100svh; display: grid; grid-template-columns: minmax(230px, 1fr) minmax(0, 780px); justify-content: center; align-items: stretch; gap: 16px; padding: 12px; }
+body { min-height: 100svh; display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr); justify-content: center; align-items: stretch; gap: 16px; padding: 12px; }
 button, input { font: inherit; }
 button { color: inherit; }
 .app { grid-column: 2; height: calc(100svh - 24px); min-height: calc(100svh - 24px); width: 100%; min-width: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
@@ -123,7 +123,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .catalog-words { color: color-mix(in srgb, var(--paper) 78%, transparent); font-size: 8px; line-height: 1.5; overflow-wrap: anywhere; }
 body.editor-open {
   display: grid;
-  grid-template-columns: minmax(200px, .8fr) minmax(0, 780px) minmax(280px, 360px);
+  grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr) minmax(280px, 360px);
   justify-content: center;
   align-items: stretch;
   gap: 16px;
