@@ -639,7 +639,6 @@ function updateEnemySystem(dt, width, height, scrollDelta) {
     }
     if (Math.hypot(enemy.x - playerX, enemy.y - playerY) < 22) {
       if (state.effects.some(effect => effect.effect === "wordWall")) {
-        createEnemyExplosion(enemy);
         defeatEnemy(enemy);
       } else {
         damagePlayer(def.contactDamage);
