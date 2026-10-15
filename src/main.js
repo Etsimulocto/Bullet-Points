@@ -39,6 +39,7 @@ const pickupMessageReadout = document.querySelector("#pickup-message");
 const healthMeter = document.querySelector("#health-meter");
 const healthText = document.querySelector("#health-text");
 const livesReadout = document.querySelector("#lives-readout");
+const armorReadout = document.querySelector("#armor-readout");
 const scoreReadout = document.querySelector("#score-readout");
 const weaponReadout = document.querySelector("#weapon-readout");
 const fontSelect = document.querySelector("#font-theme");
@@ -532,6 +533,7 @@ function renderHud() {
   healthMeter.value = Math.max(0, state.health);
   healthText.textContent = `${Math.max(0, Math.ceil(state.health))}/${Math.max(1, state.maxHealth)}`;
   livesReadout.textContent = `LIVES ${"●".repeat(Math.max(0, state.lives))}${"○".repeat(Math.max(0, state.maxLives - state.lives))}`;
+  armorReadout.textContent = `ARMOR ${Math.max(0, Math.floor(state.shields))}`;
   scoreReadout.textContent = `PTS ${Math.floor(state.score).toLocaleString()}`;
   depthReadout.textContent = `DEPTH ${Math.floor(state.world.distance / 10)} m`;
   pickupMessageReadout.textContent = state.gameOver ? "ERASED · PRESS R TO RESTART" : state.pickupMessageTime > 0 ? state.pickupMessage : "";
