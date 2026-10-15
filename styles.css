@@ -164,3 +164,36 @@ body.editor-open .app { width: 100%; min-height: calc(100svh - 24px); margin: 0;
   .touch-sticks:not([hidden]) { inset-inline: 0; bottom: 22px; padding-inline: 12px; }
   .virtual-stick { width: clamp(82px, 23vw, 112px); }
 }
+
+
+/* Keep the two-row kill boundary attached to the room floor. */
+.death-wall {
+  position: absolute;
+  z-index: 1;
+  inset-inline: 0;
+  bottom: 0;
+  height: var(--death-wall-height, 44px);
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  place-items: center;
+  border-top: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--paper));
+  color: var(--accent);
+  font-size: clamp(9px, 2.4vw, 12px);
+  font-weight: bold;
+  letter-spacing: .08em;
+  line-height: 1;
+  pointer-events: none;
+}
+.stage-label {
+  z-index: 3;
+  bottom: calc(var(--death-wall-height, 44px) + 6px);
+}
+.touch-sticks:not([hidden]) {
+  bottom: calc(var(--death-wall-height, 44px) + 14px);
+}
+@media (max-width: 520px) {
+  .touch-sticks:not([hidden]) {
+    bottom: calc(var(--death-wall-height, 44px) + 14px);
+  }
+}
