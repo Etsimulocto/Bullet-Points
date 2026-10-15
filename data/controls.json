@@ -1,21 +1,69 @@
 {
   "keyboard": {
-    "moveUp": ["w", "ArrowUp"],
-    "moveDown": ["s", "ArrowDown"],
-    "moveLeft": ["a", "ArrowLeft"],
-    "moveRight": ["d", "ArrowRight"],
-    "aimUp": ["i"],
-    "aimDown": ["k"],
-    "aimLeft": ["j"],
-    "aimRight": ["l"],
-    "fire": [" "]
+    "moveUp": [
+      "w",
+      "ArrowUp"
+    ],
+    "moveDown": [
+      "s",
+      "ArrowDown"
+    ],
+    "moveLeft": [
+      "a",
+      "ArrowLeft"
+    ],
+    "moveRight": [
+      "d",
+      "ArrowRight"
+    ],
+    "aimUp": [
+      "i"
+    ],
+    "aimDown": [
+      "k"
+    ],
+    "aimLeft": [
+      "j"
+    ],
+    "aimRight": [
+      "l"
+    ],
+    "fire": [
+      " "
+    ],
+    "weaponPrev": [
+      "q"
+    ],
+    "weaponNext": [
+      "e"
+    ]
   },
   "gamepad": {
     "deadzone": 0.18,
-    "moveAxes": { "x": 0, "y": 1 },
-    "aimAxes": { "x": 2, "y": 3 },
-    "fireButtons": [0, 7],
-    "dpad": { "up": 12, "down": 13, "left": 14, "right": 15 }
+    "moveAxes": {
+      "x": 0,
+      "y": 1
+    },
+    "aimAxes": {
+      "x": 2,
+      "y": 3
+    },
+    "fireButtons": [
+      0,
+      7
+    ],
+    "dpad": {
+      "up": 12,
+      "down": 13,
+      "left": 14,
+      "right": 15
+    },
+    "weaponPrevButtons": [
+      4
+    ],
+    "weaponNextButtons": [
+      5
+    ]
   },
   "touch": {
     "deadzone": 0.12,
