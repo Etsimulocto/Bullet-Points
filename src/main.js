@@ -12,6 +12,12 @@ const editorValidateButton = document.querySelector("#editor-validate");
 const editorSaveButton = document.querySelector("#editor-save");
 const editorDownloadButton = document.querySelector("#editor-download");
 const editorResetButton = document.querySelector("#editor-reset");
+const enemyTuner = document.querySelector("#enemy-tuner");
+const enemyTunerSelect = document.querySelector("#enemy-tuner-select");
+const enemyTunerFields = document.querySelector("#enemy-tuner-fields");
+const enemyPreviewLetter = document.querySelector("#enemy-preview-letter");
+const enemyPreviewName = document.querySelector("#enemy-preview-name");
+const explosionPreview = document.querySelector("#explosion-preview");
 const dialog = document.querySelector("#settings-dialog");
 const resumeButton = document.querySelector("#resume-button");
 const closeMenuButton = document.querySelector("#close-menu");
@@ -129,11 +135,13 @@ const weaponList = [{
   shotsPerSecond: 5, projectileSpeed: 560, spreadDegrees: 0, projectilesPerShot: 1, pattern: "single", unlockedByDefault: true
 }];
 let pickupList = [];
+let enemyList = [];
 let horizontalWallWords = ["STONE", "BARRIER", "PARAGRAPH", "BLOCK"];
 const state = {
   inverted: false, paused: false, soundEnabled: true, controlScheme: "auto", fontTheme: "dos", keys: new Set(),
   player: { x: 0.5, y: 0.76 }, projectiles: [], beams: [], pickups: [], obstacles: [], effects: [],
   fireCooldown: 0, aim: { x: 0, y: -1 }, gameOver: false,
+  enemies: [], enemyBullets: [], explosions: [], enemySpawnIndex: 0,
   health: 3, maxHealth: 3, lives: 3, maxLives: 3, score: 0, shields: 0, weaponId: "period", unlockedWeapons: ["period"],
   worldSpawnTimer: 1.5, nextWallSide: "left", runTime: 0, pickupMessage: "", pickupMessageTime: 0,
   gamepadPrevDown: false, gamepadNextDown: false,
@@ -142,9 +150,10 @@ const state = {
 
 async function loadCombatData() {
   try {
-    const [weaponResponse, pickupResponse] = await Promise.all([
+    const [weaponResponse, pickupResponse, enemyResponse] = await Promise.all([
       fetch(new URL("../data/weapons.json", import.meta.url)),
-      fetch(new URL("../data/pickups.json", import.meta.url))
+      fetch(new URL("../data/pickups.json", import.meta.url)),
+      fetch(new URL("../data/enemies.json", import.meta.url))
     ]);
     if (weaponResponse.ok) {
       const data = await weaponResponse.json();
@@ -158,6 +167,10 @@ async function loadCombatData() {
     if (pickupResponse.ok) {
       const data = await pickupResponse.json();
       if (Array.isArray(data.pickups)) pickupList = data.pickups;
+    }
+    if (enemyResponse.ok) {
+      const data = await enemyResponse.json();
+      if (Array.isArray(data.enemies)) enemyList = data.enemies.filter(enemy => enemy && enemy.id && enemy.letter && enemy.name);
     }
   } catch {
     // Keep the built-in Period Pistol if the editable lists cannot load.
@@ -472,8 +485,155 @@ function renderHud() {
   weaponReadout.textContent = `${weapon.projectileGlyph || "."} ${weapon.name.toUpperCase()}`;
 }
 
+function createEnemyExplosion(enemy) {
+  const count = Math.max(2, Math.min(32, Number(enemy.data.explosionCount) || 8));
+  const duration = Math.max(0.1, Number(enemy.data.explosionDuration) || 0.55);
+  for (let i = 0; i < count; i += 1) {
+    const angle = (Math.PI * 2 * i / count) + Math.random() * 0.24;
+    const speed = 35 + Math.random() * 90;
+    state.explosions.push({
+      x: enemy.x, y: enemy.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      glyph: enemy.data.explosionGlyph || enemy.letter,
+      color: enemy.data.explosionColor || enemy.data.enemyColor || "#ffffff",
+      life: duration, duration
+    });
+  }
+}
+
+function defeatEnemy(enemy) {
+  createEnemyExplosion(enemy);
+  state.score += Math.max(0, Number(enemy.data.score) || 0);
+  sayPickup("DEFEATED · " + enemy.data.name);
+}
+
+function damagePlayer(amount) {
+  const damage = Math.max(0, Number(amount) || 0);
+  if (damage === 0) return;
+  if (state.shields > 0) state.shields -= 1;
+  else state.health = Math.max(0, state.health - damage);
+  if (state.health <= 0) loseLife();
+}
+
+function fireEnemyBullet(enemy, playerX, playerY) {
+  const dx = playerX - enemy.x, dy = playerY - enemy.y;
+  const distance = Math.hypot(dx, dy) || 1;
+  const type = enemy.data.bulletType || "letter";
+  const glyph = type === "dot" ? (enemy.data.bulletGlyph || "·")
+    : type === "letter" ? enemy.letter
+    : type === "word" ? (enemy.data.bulletGlyph || enemy.letter + enemy.letter)
+    : type === "ring" ? "○"
+    : type === "slash" ? "/"
+    : (enemy.data.bulletGlyph || "·");
+  state.enemyBullets.push({
+    x: enemy.x, y: enemy.y, vx: dx / distance * (Number(enemy.data.bulletSpeed) || 180),
+    vy: dy / distance * (Number(enemy.data.bulletSpeed) || 180),
+    glyph, type, damage: Number(enemy.data.bulletDamage) || 1,
+    color: enemy.data.bulletColor || enemy.data.enemyColor || "#ffffff",
+    angle: Math.atan2(dy, dx)
+  });
+}
+
+function updateEnemySystem(dt, width, height, scrollDelta) {
+  const minX = roomSettings.wallWidth + 16;
+  const maxX = Math.max(minX + 1, width - roomSettings.wallWidth - 16);
+  const playerX = width * state.player.x;
+  const playerY = height * state.player.y;
+
+  state.enemies = state.enemies.filter(enemy => {
+    const def = enemy.data;
+    const speed = Math.max(0, Number(def.speed) || 0);
+    enemy.age += dt;
+    enemy.phase += dt;
+    enemy.y += scrollDelta;
+    const dx = playerX - enemy.x, dy = playerY - enemy.y;
+    const distance = Math.hypot(dx, dy) || 1;
+
+    if (def.behavior === "charge" && Math.sin(enemy.phase * 1.3) > 0.25) {
+      enemy.x += dx / distance * speed * 1.7 * dt;
+      enemy.y += dy / distance * speed * 1.7 * dt;
+    } else if (def.behavior === "chase") {
+      enemy.x += dx / distance * speed * dt;
+      enemy.y += dy / distance * speed * dt;
+    } else if (def.behavior === "strafe") {
+      enemy.x = enemy.originX + Math.sin(enemy.phase * 1.4) * Math.min(90, speed * 1.3);
+    } else if (def.behavior === "weave") {
+      enemy.x += Math.sin(enemy.phase * 2.7) * speed * dt;
+      enemy.y += Math.cos(enemy.phase * 1.8) * speed * 0.18 * dt;
+    } else if (def.behavior === "bounce") {
+      enemy.x += enemy.direction * speed * dt;
+      if (enemy.x < minX || enemy.x > maxX) enemy.direction *= -1;
+    } else if (def.behavior === "swoop") {
+      enemy.x += dx / distance * speed * 0.65 * dt;
+      enemy.y += Math.sin(enemy.phase * 2) * speed * 0.35 * dt;
+    } else if (def.behavior === "orbit") {
+      enemy.angle += dt * Math.max(0.6, speed / 45);
+      enemy.x = playerX + Math.cos(enemy.angle) * 68;
+      enemy.y = playerY + Math.sin(enemy.angle) * 48;
+    } else if (def.behavior === "stalk") {
+      enemy.x += Math.sign(dx) * speed * 0.45 * dt;
+      enemy.y += Math.sign(dy) * speed * 0.22 * dt;
+    } else {
+      enemy.x += Math.sin(enemy.phase + enemy.phase * 0.35) * speed * 0.28 * dt;
+    }
+
+    enemy.x = Math.max(minX, Math.min(maxX, enemy.x));
+    enemy.fireCooldown -= dt;
+    if (def.shoots && enemy.fireCooldown <= 0) {
+      fireEnemyBullet(enemy, playerX, playerY);
+      enemy.fireCooldown = Math.max(0.25, Number(def.fireRate) || 1.6);
+    }
+    if (Math.hypot(enemy.x - playerX, enemy.y - playerY) < 22) {
+      damagePlayer(def.contactDamage);
+      createEnemyExplosion(enemy);
+      sayPickup("HIT BY · " + def.name);
+      return false;
+    }
+    return enemy.y < state.world.deathWallY + 30;
+  });
+
+  state.enemyBullets = state.enemyBullets.filter(bullet => {
+    bullet.x += bullet.vx * dt;
+    bullet.y += bullet.vy * dt;
+    if (Math.hypot(bullet.x - playerX, bullet.y - playerY) < 14) {
+      damagePlayer(bullet.damage);
+      sayPickup("HIT BY · ENEMY FIRE");
+      return false;
+    }
+    return bullet.x > -24 && bullet.x < width + 24 && bullet.y > -24 && bullet.y < height + 24;
+  });
+
+  state.explosions = state.explosions.filter(particle => {
+    particle.x += particle.vx * dt;
+    particle.y += particle.vy * dt;
+    particle.life -= dt;
+    return particle.life > 0;
+  });
+}
+
+function updatePlayerShots(dt, width, height) {
+  const remaining = [];
+  for (const shot of state.projectiles) {
+    shot.x += shot.vx * dt;
+    shot.y += shot.vy * dt;
+    shot.angle = Math.atan2(shot.vy, shot.vx);
+    const targetIndex = state.enemies.findIndex(enemy => Math.hypot(enemy.x - shot.x, enemy.y - shot.y) < 18);
+    if (targetIndex >= 0) {
+      const target = state.enemies[targetIndex];
+      target.health -= Math.max(1, Number(shot.damage) || 1);
+      if (target.health <= 0) {
+        state.enemies.splice(targetIndex, 1);
+        defeatEnemy(target);
+      }
+      continue;
+    }
+    if (shot.x >= -20 && shot.x <= width + 20 && shot.y >= -20 && shot.y <= height + 20) remaining.push(shot);
+  }
+  state.projectiles = remaining;
+}
+
 function loseLife() {
   state.lives = Math.max(0, state.lives - 1);
+  state.enemyBullets = [];
   if (state.lives === 0) {
     state.gameOver = true;
     state.paused = true;
@@ -483,6 +643,7 @@ function loseLife() {
   state.player = { x: 0.5, y: getPlayerStartY() };
   state.health = state.maxHealth;
   state.projectiles = [];
+  state.enemyBullets = [];
   state.pickupMessage = `LIFE LOST · ${state.lives} LEFT`;
   state.pickupMessageTime = 2.4;
 }
@@ -534,6 +695,46 @@ function draw() {
     context.textBaseline = "middle";
     setCanvasFont(16, "bold");
     context.fillText(pickup.data.glyph || "?", 0, 0);
+    context.restore();
+  });
+
+  state.enemies.forEach(enemy => {
+    context.save();
+    context.beginPath();
+    context.arc(enemy.x, enemy.y, 15, 0, Math.PI * 2);
+    context.fillStyle = color.paper;
+    context.fill();
+    context.lineWidth = 3;
+    context.strokeStyle = enemy.data.enemyColor || color.accent;
+    context.stroke();
+    context.fillStyle = enemy.data.enemyColor || color.accent;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    setCanvasFont(22, "bold");
+    context.fillText(enemy.letter, enemy.x, enemy.y + 1);
+    context.restore();
+  });
+
+  state.enemyBullets.forEach(bullet => {
+    context.save();
+    context.translate(bullet.x, bullet.y);
+    context.rotate(bullet.angle);
+    context.fillStyle = bullet.color;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    setCanvasFont(bullet.type === "word" ? 13 : 17, "bold");
+    context.fillText(bullet.glyph, 0, 0);
+    context.restore();
+  });
+
+  state.explosions.forEach(particle => {
+    context.save();
+    context.globalAlpha = Math.max(0, particle.life / particle.duration);
+    context.fillStyle = particle.color;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    setCanvasFont(12 + (1 - particle.life / particle.duration) * 9, "bold");
+    context.fillText(particle.glyph, particle.x, particle.y);
     context.restore();
   });
 
@@ -626,12 +827,7 @@ function update(time) {
       shootWeapon(weapon, state.aim, width, height);
       state.fireCooldown = 1 / Math.max(0.2, (Number(weapon.shotsPerSecond) || 4) * fireRate);
     }
-    state.projectiles = state.projectiles.filter(shot => {
-      shot.x += shot.vx * dt;
-      shot.y += shot.vy * dt;
-      shot.angle = Math.atan2(shot.vy, shot.vx);
-      return shot.x >= -20 && shot.x <= width + 20 && shot.y >= -20 && shot.y <= height + 20;
-    });
+    updatePlayerShots(dt, width, height);
     state.beams = state.beams.map(beam => ({ ...beam, remaining: beam.remaining - dt })).filter(beam => beam.remaining > 0);
     state.obstacles = state.obstacles.filter(obstacle => {
       obstacle.previousY = obstacle.y;
@@ -672,6 +868,7 @@ function update(time) {
     }
     state.player.x = nextPlayerX;
     state.player.y = nextPlayerY;
+    updateEnemySystem(dt, width, height, scrollDelta);
     const playerX = width * state.player.x, playerY = height * state.player.y;
     state.pickups = state.pickups.filter(pickup => {
       pickup.y += dt * scrollStep;
@@ -695,6 +892,10 @@ function resetRun() {
   state.gameOver = false;
   state.projectiles = [];
   state.beams = [];
+  state.enemies = [];
+  state.enemyBullets = [];
+  state.explosions = [];
+  state.enemySpawnIndex = 0;
   state.pickups = [];
   state.obstacles = [];
   state.effects = [];
@@ -732,12 +933,36 @@ async function loadHorizontalWallWords() {
   }
 }
 
+function spawnEnemy(width) {
+  if (!enemyList.length || state.enemies.length >= 5) return;
+  const data = enemyList[state.enemySpawnIndex % enemyList.length];
+  state.enemySpawnIndex += 1;
+  const left = roomSettings.wallWidth + 18;
+  const right = Math.max(left + 1, width - roomSettings.wallWidth - 18);
+  const spawnX = left + Math.random() * (right - left);
+  state.enemies.push({
+    id: data.id, letter: data.letter, data,
+    x: spawnX, y: -24,
+    originX: spawnX, phase: Math.random() * Math.PI * 2,
+    age: 0, direction: Math.random() < 0.5 ? -1 : 1, angle: Math.random() * Math.PI * 2,
+    health: Math.max(1, Number(data.health) || 1),
+    fireCooldown: Math.random() * Math.max(0.4, Number(data.fireRate) || 1.5)
+  });
+}
+
 function spawnWorldDrop(width) {
   const roomWidth = Math.max(80, width - roomSettings.wallWidth * 2 - 24);
-  if (pickupList.length && Math.random() < 0.46) {
+  const enemyChance = enemyList.length ? 0.3 : 0;
+  const pickupChance = pickupList.length ? 0.35 : 0;
+  const roll = Math.random();
+  if (roll < enemyChance) {
+    spawnEnemy(width);
+    return;
+  }
+  if (roll < enemyChance + pickupChance) {
     const totalWeight = pickupList.reduce((sum, item) => sum + Math.max(0, Number(item.weight) || 1), 0);
-    let roll = Math.random() * totalWeight;
-    const item = pickupList.find(entry => (roll -= Math.max(0, Number(entry.weight) || 1)) <= 0) || pickupList[0];
+    let itemRoll = Math.random() * totalWeight;
+    const item = pickupList.find(entry => (itemRoll -= Math.max(0, Number(entry.weight) || 1)) <= 0) || pickupList[0];
     const left = roomSettings.wallWidth + 12;
     state.pickups.push({ data: item, x: left + Math.random() * roomWidth, y: -20 });
     return;
@@ -877,6 +1102,127 @@ function setEditorStatus(message) {
   editorStatus.textContent = message;
 }
 
+function renderEnemyPreview(enemy) {
+  if (!enemy) return;
+  enemyPreviewLetter.textContent = enemy.letter || "?";
+  enemyPreviewLetter.style.color = enemy.enemyColor || "#ffffff";
+  enemyPreviewName.textContent = enemy.name || "Unnamed enemy";
+  enemyPreviewName.style.color = enemy.enemyColor || "#ffffff";
+  const count = Math.max(1, Math.min(24, Number(enemy.explosionCount) || 8));
+  explosionPreview.textContent = Array.from({ length: count }, () => enemy.explosionGlyph || enemy.letter || "?").join(" ");
+  explosionPreview.style.color = enemy.explosionColor || enemy.enemyColor || "#ffffff";
+}
+
+function refreshEnemyRosterFromEditor(data) {
+  if (!Array.isArray(data?.enemies)) return;
+  enemyList = data.enemies;
+  state.enemies.forEach(enemy => {
+    const updated = enemyList.find(entry => entry.id === enemy.id);
+    if (updated) {
+      enemy.data = updated;
+      enemy.health = Math.min(enemy.health, Math.max(1, Number(updated.health) || 1));
+    }
+  });
+}
+
+function renderEnemyTuner() {
+  const active = editorPath === "../data/enemies.json";
+  enemyTuner.hidden = !active;
+  if (!active) return;
+
+  let data;
+  try { data = JSON.parse(editorText.value); } catch { return; }
+  if (!Array.isArray(data.enemies) || !data.enemies.length) return;
+  const previousSelection = enemyTunerSelect.value;
+  enemyTunerSelect.replaceChildren();
+  data.enemies.forEach(enemy => {
+    const option = document.createElement("option");
+    option.value = enemy.id;
+    option.textContent = enemy.letter + " · " + enemy.name;
+    enemyTunerSelect.append(option);
+  });
+  enemyTunerSelect.value = data.enemies.some(enemy => enemy.id === previousSelection) ? previousSelection : data.enemies[0].id;
+  const enemy = data.enemies.find(entry => entry.id === enemyTunerSelect.value) || data.enemies[0];
+  enemyTunerFields.replaceChildren();
+
+  const schema = [
+    { section: "IDENTITY & STATS" },
+    { key: "name", label: "Enemy name", type: "text" },
+    { key: "health", label: "Health", type: "number", min: 1, max: 99, step: 1 },
+    { key: "speed", label: "Movement speed", type: "number", min: 0, max: 500, step: 1 },
+    { key: "contactDamage", label: "Contact damage", type: "number", min: 0, max: 20, step: 1 },
+    { key: "score", label: "Points", type: "number", min: 0, max: 9999, step: 5 },
+    { key: "enemyColor", label: "Enemy color", type: "color" },
+    { key: "behavior", label: "Movement", type: "select", options: ["drift","charge","chase","strafe","weave","bounce","swoop","orbit","stalk"] },
+    { section: "ATTACK" },
+    { key: "shoots", label: "Shoots at player", type: "checkbox" },
+    { key: "fireRate", label: "Seconds between shots", type: "number", min: 0.25, max: 12, step: 0.05 },
+    { key: "bulletType", label: "Bullet style", type: "select", options: ["dot","letter","word","ring","slash"] },
+    { key: "bulletGlyph", label: "Bullet glyph", type: "text" },
+    { key: "bulletSpeed", label: "Bullet speed", type: "number", min: 20, max: 900, step: 5 },
+    { key: "bulletDamage", label: "Bullet damage", type: "number", min: 0, max: 20, step: 1 },
+    { key: "bulletColor", label: "Bullet color", type: "color" },
+    { section: "LETTER BURST" },
+    { key: "explosionGlyph", label: "Burst letter", type: "text" },
+    { key: "explosionCount", label: "Burst letters", type: "number", min: 2, max: 32, step: 1 },
+    { key: "explosionDuration", label: "Burst duration", type: "number", min: 0.1, max: 2, step: 0.05 },
+    { key: "explosionColor", label: "Burst color", type: "color" }
+  ];
+
+  schema.forEach(field => {
+    if (field.section) {
+      const heading = document.createElement("h4");
+      heading.className = "enemy-tuner-section";
+      heading.textContent = field.section;
+      enemyTunerFields.append(heading);
+      return;
+    }
+    const label = document.createElement("label");
+    label.className = "enemy-tuner-field";
+    const caption = document.createElement("span");
+    caption.textContent = field.label;
+    let control;
+    if (field.type === "select") {
+      control = document.createElement("select");
+      field.options.forEach(value => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value.toUpperCase();
+        control.append(option);
+      });
+      control.value = enemy[field.key] || field.options[0];
+    } else {
+      control = document.createElement("input");
+      control.type = field.type;
+      if (field.type === "checkbox") control.checked = Boolean(enemy[field.key]);
+      else if (field.type === "color") control.value = /^#[0-9a-f]{6}$/i.test(enemy[field.key] || "") ? enemy[field.key] : "#ffffff";
+      else {
+        control.value = enemy[field.key] ?? "";
+        if (field.type === "number") {
+          control.min = field.min;
+          control.max = field.max;
+          control.step = field.step;
+        }
+      }
+    }
+    control.addEventListener(field.type === "select" ? "change" : "input", () => {
+      const roster = parsedEditorData();
+      const target = roster?.enemies?.find(entry => entry.id === enemyTunerSelect.value);
+      if (!target) return;
+      target[field.key] = field.type === "checkbox" ? control.checked
+        : field.type === "number" ? Number(control.value)
+        : control.value;
+      editorText.value = JSON.stringify(roster, null, 2);
+      editorText.dispatchEvent(new Event("input", { bubbles: true }));
+      refreshEnemyRosterFromEditor(roster);
+      renderEnemyPreview(target);
+    });
+    label.append(caption, control);
+    enemyTunerFields.append(label);
+  });
+  renderEnemyPreview(enemy);
+}
+
 async function loadEditorFile(path, allowDiscard = false) {
   if (editorDirty && !allowDiscard && !window.confirm("Discard unsaved editor changes?")) {
     editorFileSelect.value = editorPath;
@@ -891,6 +1237,10 @@ async function loadEditorFile(path, allowDiscard = false) {
     if (draft !== null) {
       editorText.value = draft;
       setEditorStatus("Loaded your browser-local draft. Save it as a file when ready.");
+      renderEnemyTuner();
+      try { refreshEnemyRosterFromEditor(JSON.parse(draft)); } catch {}
+      renderEnemyTuner();
+      refreshEnemyRosterFromEditor(JSON.parse(draft));
       editorLoaded = true;
       return;
     }
@@ -904,10 +1254,16 @@ async function loadEditorFile(path, allowDiscard = false) {
     JSON.parse(data);
     editorText.value = JSON.stringify(JSON.parse(data), null, 2);
     setEditorStatus("Loaded the repository version.");
+    renderEnemyTuner();
+    if (path === "../data/enemies.json") refreshEnemyRosterFromEditor(JSON.parse(data));
+    renderEnemyTuner();
+    if (path === "../data/enemies.json") refreshEnemyRosterFromEditor(JSON.parse(data));
     editorLoaded = true;
   } catch {
     editorText.value = "";
     setEditorStatus("Could not load this file. Run the game through the local web server.");
+    renderEnemyTuner();
+    renderEnemyTuner();
   }
 }
 
@@ -1203,11 +1559,23 @@ window.addEventListener("blur", () => state.keys.clear());
 
 editorToggleButton.addEventListener("click", () => toggleEditor());
 editorCloseButton.addEventListener("click", () => toggleEditor(false));
-editorFileSelect.addEventListener("change", () => loadEditorFile(editorFileSelect.value));
+editorFileSelect.addEventListener("change", async () => {
+  await loadEditorFile(editorFileSelect.value);
+  renderEnemyTuner();
+});
 editorText.addEventListener("input", () => {
   editorDirty = true;
   setEditorStatus("Unsaved edits. Check the JSON before saving your draft.");
+  if (editorPath === "../data/enemies.json") {
+    try {
+      const data = JSON.parse(editorText.value);
+      refreshEnemyRosterFromEditor(data);
+      const enemy = data.enemies?.find(entry => entry.id === enemyTunerSelect.value);
+      if (enemy) renderEnemyPreview(enemy);
+    } catch {}
+  }
 });
+enemyTunerSelect.addEventListener("change", renderEnemyTuner);
 editorValidateButton.addEventListener("click", () => {
   if (parsedEditorData() !== null) setEditorStatus("JSON is valid.");
 });
