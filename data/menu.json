@@ -2,10 +2,22 @@
   "title": "Bullet Points",
   "subtitle": "An Infinite Word Dungeon",
   "buttons": [
-    { "id": "play", "label": "START RUN" },
-    { "id": "editor", "label": "FEED EDITOR" },
-    { "id": "settings", "label": "SETTINGS" },
-    { "id": "credits", "label": "CREDITS" }
+    {
+      "id": "play",
+      "label": "START RUN"
+    },
+    {
+      "id": "editor",
+      "label": "FEED EDITOR"
+    },
+    {
+      "id": "settings",
+      "label": "SETTINGS"
+    },
+    {
+      "id": "credits",
+      "label": "CREDITS"
+    }
   ],
   "labels": {
     "move": "WASD / ARROWS TO MOVE",
@@ -28,7 +40,7 @@
     "controlsHeading": "CONTROLS",
     "keyboard": "Keyboard and mouse",
     "touch": "Dual mobile sticks",
-    "touchNote": "(input support is planned)",
+    "touchNote": "(left moves · right aims and fires)",
     "saveSlots": "SAVE SLOTS",
     "storageNote": "Stored in this browser",
     "slotName": "SAVE SLOT {slot}",
@@ -52,7 +64,13 @@
     "soundEnabled": "Sound effects enabled.",
     "soundMuted": "Sound effects muted.",
     "keyboardSelected": "Keyboard and mouse selected.",
-    "touchSelected": "Dual mobile sticks selected; touch input is a future build step."
+    "touchSelected": "Dual mobile sticks selected.",
+    "auto": "Auto: use any active input",
+    "gamepad": "Gamepad",
+    "noGamepad": "No controller detected. Connect a USB or Bluetooth gamepad.",
+    "gamepadConnected": "Connected: {name}",
+    "gamepadUnsupported": "Gamepad API unavailable in this browser.",
+    "gamepadSelected": "Gamepad selected."
   },
   "messages": {
     "loading": "TURNING THE PAGE…",
