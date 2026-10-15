@@ -38,6 +38,14 @@ const weaponReadout = document.querySelector("#weapon-readout");
 const controlMap = {keyboard:{moveUp:["w","ArrowUp"],moveDown:["s","ArrowDown"],moveLeft:["a","ArrowLeft"],moveRight:["d","ArrowRight"],aimUp:["i"],aimDown:["k"],aimLeft:["j"],aimRight:["l"],fire:[" "]},gamepad:{deadzone:.18,moveAxes:{x:0,y:1},aimAxes:{x:2,y:3},fireButtons:[0,7],dpad:{up:12,down:13,left:14,right:15}},touch:{deadzone:.12,fireWhileRightStickHeld:true}};
 const input = {pad:null,move:{x:0,y:0},aim:{x:0,y:0},touchMove:{x:0,y:0},touchAim:{x:0,y:0},touchFire:false,mouseAim:{x:0,y:0},mouseFire:false};
 let lastGamepadMessage = "";
+const gamepadUiState = {
+  startDown: false,
+  selectDown: false,
+  backDown: false,
+  activateDown: false,
+  direction: "",
+  repeatIn: 0,
+};
 
 const palette = {
   paper: "#f4f0e6",
@@ -264,6 +272,78 @@ function pollGamepad() {
   input.move = {x:deadzone(ax(cfg.moveAxes.x),cfg.deadzone)+Number(down(cfg.dpad.right))-Number(down(cfg.dpad.left)),y:deadzone(ax(cfg.moveAxes.y),cfg.deadzone)+Number(down(cfg.dpad.down))-Number(down(cfg.dpad.up))};
   input.aim = {x:deadzone(ax(cfg.aimAxes.x),cfg.deadzone),y:deadzone(ax(cfg.aimAxes.y),cfg.deadzone)};
 }
+function handleGamepadUi(dt) {
+  const pad = input.pad;
+  if (!pad) {
+    gamepadUiState.startDown = false;
+    gamepadUiState.selectDown = false;
+    gamepadUiState.backDown = false;
+    gamepadUiState.activateDown = false;
+    gamepadUiState.direction = "";
+    gamepadUiState.repeatIn = 0;
+    return;
+  }
+  const cfg = controlMap.gamepad;
+  const down = index => Number.isInteger(index) && Boolean(pad.buttons[index]?.pressed);
+  const start = down(cfg.menuButton ?? 9);
+  const select = down(cfg.editorButton ?? 8);
+  const back = down(cfg.backButton ?? 1);
+  const activate = down(cfg.activateButton ?? 0);
+
+  if (start && !gamepadUiState.startDown) {
+    if (dialog.open) resumeRun();
+    else openSettings();
+  }
+  if (select && !gamepadUiState.selectDown) {
+    if (!editorPanel.hidden) toggleEditor(false);
+    else toggleEditor(true);
+  }
+  if (back && !gamepadUiState.backDown) {
+    if (!editorPanel.hidden) toggleEditor(false);
+    else if (dialog.open) resumeRun();
+  }
+
+  const root = dialog.open ? dialog : (!editorPanel.hidden ? editorPanel : null);
+  if (root) {
+    const deadzoneValue = cfg.deadzone ?? 0.18;
+    const axis = index => Number.isFinite(pad.axes[index]) ? pad.axes[index] : 0;
+    const horizontal = Number(down(cfg.dpad?.right ?? 15)) - Number(down(cfg.dpad?.left ?? 14)) + deadzone(axis(cfg.moveAxes?.x ?? 0), deadzoneValue);
+    const vertical = Number(down(cfg.dpad?.down ?? 13)) - Number(down(cfg.dpad?.up ?? 12)) + deadzone(axis(cfg.moveAxes?.y ?? 1), deadzoneValue);
+    let direction = "";
+    if (Math.abs(vertical) > 0.5) direction = vertical > 0 ? "down" : "up";
+    else if (Math.abs(horizontal) > 0.5) direction = horizontal > 0 ? "right" : "left";
+
+    if (direction) {
+      if (direction !== gamepadUiState.direction || gamepadUiState.repeatIn <= 0) {
+        const controls = Array.from(root.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'))
+          .filter(element => element.getClientRects().length > 0);
+        if (controls.length) {
+          let index = controls.indexOf(document.activeElement);
+          if (index < 0) index = 0;
+          const step = direction === "down" || direction === "right" ? 1 : -1;
+          controls[(index + step + controls.length) % controls.length].focus();
+        }
+        gamepadUiState.repeatIn = 0.28;
+      } else {
+        gamepadUiState.repeatIn -= dt;
+      }
+    }
+    gamepadUiState.direction = direction;
+
+    if (activate && !gamepadUiState.activateDown) {
+      const target = document.activeElement;
+      if (target && root.contains(target) && target.matches("button, input[type=checkbox], input[type=radio], select, [role=button]")) target.click();
+    }
+  } else {
+    gamepadUiState.direction = "";
+    gamepadUiState.repeatIn = 0;
+  }
+
+  gamepadUiState.startDown = start;
+  gamepadUiState.selectDown = select;
+  gamepadUiState.backDown = back;
+  gamepadUiState.activateDown = activate;
+}
 function keyAxis(negative, positive) {
   return Number(positive.some(k => state.keys.has(k))) - Number(negative.some(k => state.keys.has(k)));
 }
@@ -287,7 +367,8 @@ function readControls() {
     state.gamepadPrevDown = false;
     state.gamepadNextDown = false;
   }
-  const fire=(useK&&(kb.fire||[]).some(k=>state.keys.has(k)|| (k===" "&&state.keys.has(" "))))||(useK&&input.mouseFire)||(useG&&input.pad&&(controlMap.gamepad.fireButtons||[]).some(i=>input.pad.buttons[i]?.pressed))||(useT&&input.touchFire&&controlMap.touch.fireWhileRightStickHeld);
+  const rightStickFiring = useG && input.pad && controlMap.gamepad.rightStickFires !== false && Math.hypot(input.aim.x, input.aim.y) > (controlMap.gamepad.rightStickFireThreshold ?? 0.24);
+  const fire=(useK&&(kb.fire||[]).some(k=>state.keys.has(k)|| (k===" "&&state.keys.has(" "))))||(useK&&input.mouseFire)||(useG&&input.pad&&(controlMap.gamepad.fireButtons||[]).some(i=>input.pad.buttons[i]?.pressed))||rightStickFiring||(useT&&input.touchFire&&controlMap.touch.fireWhileRightStickHeld);
   return {move,aim,fire};
 }
 function setStick(stick, knob, point) {
@@ -497,6 +578,8 @@ function draw() {
 function update(time) {
   const dt = Math.min((time - state.lastTime) / 1000 || 0, 0.04);
   state.lastTime = time;
+  pollGamepad();
+  handleGamepadUi(dt);
   const { width, height } = canvas.getBoundingClientRect();
   state.world.deathWallY = height - getDeathWallHeight();
 
