@@ -633,6 +633,7 @@ function update(time) {
     });
     state.beams = state.beams.map(beam => ({ ...beam, remaining: beam.remaining - dt })).filter(beam => beam.remaining > 0);
     state.obstacles = state.obstacles.filter(obstacle => {
+      obstacle.previousY = obstacle.y;
       obstacle.y += dt * scrollStep;
       return obstacle.y < state.world.deathWallY - 12;
     });
@@ -643,7 +644,9 @@ function update(time) {
     nextPlayerY = Math.max(minY, Math.min(maxY, nextPlayerY));
     const nextPx = nextPlayerX * width, nextPy = nextPlayerY * height;
     const oldPx = previousPlayerX * width, oldPy = previousPlayerY * height;
-    const startedInsideWall = Boolean(collidesWithObstacle(oldPx, oldPy));
+    const startedInsideWall = state.obstacles.some(obstacle =>
+      obstacleContainsPoint(oldPx, oldPy, obstacle, obstacle.previousY ?? obstacle.y)
+    );
     const endCollision = collidesWithObstacle(nextPx, nextPy);
     const sweptCollision = !startedInsideWall && state.obstacles.find(obstacle =>
       segmentHitsObstacle(oldPx, oldPy, nextPx, nextPy, obstacle)
@@ -753,26 +756,31 @@ function spawnWorldDrop(width) {
   state.nextWallSide = gapSide === "left" ? "right" : "left";
 }
 
-function collidesWithObstacle(x, y) {
+function obstacleContainsPoint(x, y, obstacle, obstacleY = obstacle.y) {
   const radius = 10;
-  return state.obstacles.find(obstacle =>
-    x + radius > obstacle.x && x - radius < obstacle.x + obstacle.width &&
-    y + radius > obstacle.y - obstacle.height / 2 && y - radius < obstacle.y + obstacle.height / 2
-  );
+  return x + radius > obstacle.x && x - radius < obstacle.x + obstacle.width &&
+    y + radius > obstacleY - obstacle.height / 2 && y - radius < obstacleY + obstacle.height / 2;
+}
+
+function collidesWithObstacle(x, y) {
+  return state.obstacles.find(obstacle => obstacleContainsPoint(x, y, obstacle));
 }
 
 function segmentHitsObstacle(fromX, fromY, toX, toY, obstacle) {
   const radius = 10;
   const left = obstacle.x - radius;
   const right = obstacle.x + obstacle.width + radius;
-  const top = obstacle.y - obstacle.height / 2 - radius;
-  const bottom = obstacle.y + obstacle.height / 2 + radius;
+  const previousY = Number.isFinite(obstacle.previousY) ? obstacle.previousY : obstacle.y;
+  const fromRelativeY = fromY - previousY;
+  const toRelativeY = toY - obstacle.y;
+  const top = -obstacle.height / 2 - radius;
+  const bottom = obstacle.height / 2 + radius;
   let enter = 0;
   let leave = 1;
 
   for (const [origin, delta, min, max] of [
     [fromX, toX - fromX, left, right],
-    [fromY, toY - fromY, top, bottom]
+    [fromRelativeY, toRelativeY - fromRelativeY, top, bottom]
   ]) {
     if (Math.abs(delta) < 0.0001) {
       if (origin < min || origin > max) return false;
