@@ -4,6 +4,7 @@ const catalogContent = document.querySelector("#catalog-content");
 const catalogSummary = document.querySelector("#catalog-summary");
 const catalogRunStatus = document.querySelector("#catalog-run-status");
 const menuButton = document.querySelector("#menu-button");
+const catalogToggleButton = document.querySelector("#catalog-toggle");
 const editorToggleButton = document.querySelector("#editor-toggle");
 const editorPanel = document.querySelector("#editor-panel");
 const editorCloseButton = document.querySelector("#editor-close");
@@ -57,13 +58,14 @@ const fontThemes = {
   vga: { canvas: "'Lucida Console', 'DejaVu Sans Mono', monospace" },
   arcade: { canvas: "'Arial Black', Impact, 'DejaVu Sans Mono', monospace" }
 };
-const controlMap = {keyboard:{moveUp:["w","ArrowUp"],moveDown:["s","ArrowDown"],moveLeft:["a","ArrowLeft"],moveRight:["d","ArrowRight"],aimUp:["i"],aimDown:["k"],aimLeft:["j"],aimRight:["l"],fire:[" "]},gamepad:{deadzone:.18,moveAxes:{x:0,y:1},aimAxes:{x:2,y:3},fireButtons:[0,7],dpad:{up:12,down:13,left:14,right:15}},touch:{deadzone:.12,fireWhileRightStickHeld:true}};
+const controlMap = {keyboard:{moveUp:["w","ArrowUp"],moveDown:["s","ArrowDown"],moveLeft:["a","ArrowLeft"],moveRight:["d","ArrowRight"],aimUp:["i"],aimDown:["k"],aimLeft:["j"],aimRight:["l"],fire:[" "],catalogToggle:["F6"]},gamepad:{deadzone:.18,moveAxes:{x:0,y:1},aimAxes:{x:2,y:3},fireButtons:[0,7],catalogButton:4,weaponPrevButtons:[6],weaponNextButtons:[5],dpad:{up:12,down:13,left:14,right:15}},touch:{deadzone:.12,fireWhileRightStickHeld:true}};
 const input = {pad:null,move:{x:0,y:0},aim:{x:0,y:0},touchMove:{x:0,y:0},touchAim:{x:0,y:0},touchFire:false,mouseAim:{x:0,y:0},mouseFire:false};
 let lastGamepadMessage = "";
 const gamepadUiState = {
   startDown: false,
   selectDown: false,
   backDown: false,
+  catalogDown: false,
   activateDown: false,
   direction: "",
   repeatIn: 0,
@@ -492,6 +494,7 @@ function handleGamepadUi(dt) {
     gamepadUiState.startDown = false;
     gamepadUiState.selectDown = false;
     gamepadUiState.backDown = false;
+    gamepadUiState.catalogDown = false;
     gamepadUiState.activateDown = false;
     gamepadUiState.direction = "";
     gamepadUiState.repeatIn = 0;
@@ -502,8 +505,10 @@ function handleGamepadUi(dt) {
   const start = down(cfg.menuButton ?? 9);
   const select = down(cfg.editorButton ?? 8);
   const back = down(cfg.backButton ?? 1);
+  const catalog = down(cfg.catalogButton ?? 4);
   const activate = down(cfg.activateButton ?? 0);
 
+  if (catalog && !gamepadUiState.catalogDown && window.matchMedia("(min-width: 901px)").matches) toggleCatalogPanel();
   if (start && !gamepadUiState.startDown) {
     if (dialog.open) resumeRun();
     else openSettings();
@@ -561,6 +566,7 @@ function handleGamepadUi(dt) {
   gamepadUiState.startDown = start;
   gamepadUiState.selectDown = select;
   gamepadUiState.backDown = back;
+  gamepadUiState.catalogDown = catalog;
   gamepadUiState.activateDown = activate;
 }
 function keyAxis(negative, positive) {
@@ -1717,6 +1723,17 @@ function parsedEditorData() {
   }
 }
 
+function toggleCatalogPanel(forceVisible) {
+  const visible = typeof forceVisible === "boolean"
+    ? forceVisible
+    : document.body.classList.contains("catalog-hidden");
+  document.body.classList.toggle("catalog-hidden", !visible);
+  catalogToggleButton.setAttribute("aria-expanded", String(visible));
+  catalogToggleButton.setAttribute("aria-label", (visible ? "Hide" : "Show") + " Dungeon Index (F6 or L1)");
+  try { localStorage.setItem("bulletPoints.catalogHidden", String(!visible)); } catch {}
+  requestAnimationFrame(resizeCanvas);
+}
+
 function toggleEditor(forceOpen) {
   const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : editorPanel.hidden;
   if (shouldOpen) {
@@ -1959,6 +1976,11 @@ canvas.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse"&&["auto","k
 window.addEventListener("pointerup",e=>{if(e.pointerType==="mouse")input.mouseFire=false;});
 window.addEventListener("blur",()=>{state.keys.clear();input.mouseFire=false;input.touchFire=false;input.touchMove={x:0,y:0};input.touchAim={x:0,y:0};});
 window.addEventListener("keydown", (event) => {
+  if (event.key === "F6" && window.matchMedia("(min-width: 901px)").matches && !event.target.matches("input, textarea, select, [contenteditable='true']")) {
+    event.preventDefault();
+    toggleCatalogPanel();
+    return;
+  }
   if (event.key === "F8") {
     event.preventDefault();
     toggleEditor();
@@ -1998,6 +2020,7 @@ window.addEventListener("keyup", (event) => {
 });
 window.addEventListener("blur", () => state.keys.clear());
 
+catalogToggleButton.addEventListener("click", () => toggleCatalogPanel());
 editorToggleButton.addEventListener("click", () => toggleEditor());
 editorCloseButton.addEventListener("click", () => toggleEditor(false));
 editorFileSelect.addEventListener("change", async () => {
@@ -2062,6 +2085,11 @@ renderSaveSlots();
 applyMenuCopy();
 try { applyFontTheme(localStorage.getItem("bulletPoints.fontTheme") || "dos"); } catch { applyFontTheme("dos"); }
 applyControlScheme();
+try {
+  const catalogHidden = localStorage.getItem("bulletPoints.catalogHidden") === "true";
+  if (catalogHidden) toggleCatalogPanel(false);
+  else catalogToggleButton.setAttribute("aria-expanded", "true");
+} catch {}
 applyDeathWallSettings();
 state.player.y = getPlayerStartY();
 loadControlMap();
