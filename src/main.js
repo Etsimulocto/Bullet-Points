@@ -27,6 +27,11 @@ const touchSticks = document.querySelector("#touch-sticks"), app = document.quer
 const stage = document.querySelector(".stage");
 const deathWallLine1 = document.querySelector("#death-wall-line-1");
 const deathWallLine2 = document.querySelector("#death-wall-line-2");
+const healthMeter = document.querySelector("#health-meter");
+const healthText = document.querySelector("#health-text");
+const livesReadout = document.querySelector("#lives-readout");
+const scoreReadout = document.querySelector("#score-readout");
+const weaponReadout = document.querySelector("#weapon-readout");
 const controlMap = {keyboard:{moveUp:["w","ArrowUp"],moveDown:["s","ArrowDown"],moveLeft:["a","ArrowLeft"],moveRight:["d","ArrowRight"],aimUp:["i"],aimDown:["k"],aimLeft:["j"],aimRight:["l"],fire:[" "]},gamepad:{deadzone:.18,moveAxes:{x:0,y:1},aimAxes:{x:2,y:3},fireButtons:[0,7],dpad:{up:12,down:13,left:14,right:15}},touch:{deadzone:.12,fireWhileRightStickHeld:true}};
 const input = {pad:null,move:{x:0,y:0},aim:{x:0,y:0},touchMove:{x:0,y:0},touchAim:{x:0,y:0},touchFire:false,mouseAim:{x:0,y:0},mouseFire:false};
 let lastGamepadMessage = "";
@@ -110,7 +115,7 @@ const state = {
   inverted: false, paused: false, soundEnabled: true, controlScheme: "auto", keys: new Set(),
   player: { x: 0.5, y: 0.76 }, projectiles: [], beams: [], pickups: [], effects: [],
   fireCooldown: 0, aim: { x: 0, y: -1 }, gameOver: false,
-  health: 3, maxHealth: 3, shields: 0, weaponId: "period", unlockedWeapons: ["period"],
+  health: 3, maxHealth: 3, lives: 3, maxLives: 3, score: 0, shields: 0, weaponId: "period", unlockedWeapons: ["period"],
   pickupSpawnTimer: 3, runTime: 0, pickupMessage: "", pickupMessageTime: 0,
   gamepadPrevDown: false, gamepadNextDown: false,
   world: { scrollOffset: 0, deathWallY: null, distance: 0 }, lastTime: 0,
@@ -167,6 +172,8 @@ function sayPickup(message) {
 }
 function collectPickup(pickup) {
   const item = pickup.data;
+  state.score += 50;
+  if (item.effect === "bonusDistance") state.score += Math.floor(Number(item.amount || 0) / 10);
   if (item.effect === "restoreHealth") {
     const before = state.health;
     state.health = Math.min(state.maxHealth, state.health + item.amount);
@@ -346,7 +353,33 @@ function applyDeathWallSettings() {
   deathWallLine2.textContent = roomSettings.deathWallLines[1] || "NO ESCAPE";
 }
 
+function renderHud() {
+  healthMeter.max = Math.max(1, state.maxHealth);
+  healthMeter.value = Math.max(0, state.health);
+  healthText.textContent = `${Math.max(0, Math.ceil(state.health))}/${Math.max(1, state.maxHealth)}`;
+  livesReadout.textContent = `LIVES ${"●".repeat(Math.max(0, state.lives))}${"○".repeat(Math.max(0, state.maxLives - state.lives))}`;
+  scoreReadout.textContent = `PTS ${Math.floor(state.score).toLocaleString()}`;
+  const weapon = getWeapon();
+  weaponReadout.textContent = `${weapon.projectileGlyph || "."} ${weapon.name.toUpperCase()}`;
+}
+
+function loseLife() {
+  state.lives = Math.max(0, state.lives - 1);
+  if (state.lives === 0) {
+    state.gameOver = true;
+    state.paused = true;
+    state.keys.clear();
+    return;
+  }
+  state.player = { x: 0.5, y: 0.72 };
+  state.health = state.maxHealth;
+  state.projectiles = [];
+  state.pickupMessage = `LIFE LOST · ${state.lives} LEFT`;
+  state.pickupMessageTime = 2.4;
+}
+
 function draw() {
+  renderHud();
   const { width, height } = canvas.getBoundingClientRect();
   const color = colors();
   context.clearRect(0, 0, width, height);
@@ -453,7 +486,8 @@ function draw() {
     context.fillText("ERASED", width / 2, height * 0.47);
     context.fillStyle = color.ink;
     context.font = "12px 'Courier New', monospace";
-    context.fillText("PRESS R TO RESTART", width / 2, height * 0.53);
+    context.fillText(`SCORE ${Math.floor(state.score).toLocaleString()} · NO LIVES LEFT`, width / 2, height * 0.51);
+    context.fillText("PRESS R TO RESTART", width / 2, height * 0.55);
   }
 }
 
@@ -475,7 +509,9 @@ function update(time) {
     const scrollScale = effectValue("slowScroll", 1);
     const scrollStep = roomSettings.scrollSpeed * scrollScale;
     state.world.scrollOffset += dt * scrollStep;
+    const previousDepth = Math.floor(state.world.distance / 10);
     state.world.distance += dt * scrollStep;
+    state.score += Math.floor(state.world.distance / 10) - previousDepth;
 
     state.pickupSpawnTimer -= dt;
     if (state.pickupSpawnTimer <= 0 && pickupList.length) {
@@ -514,11 +550,7 @@ function update(time) {
     const wallMargin = Math.min(0.18, roomSettings.wallWidth / Math.max(width, 1) + 0.025);
     state.player.x = Math.max(wallMargin, Math.min(1 - wallMargin, state.player.x));
     state.player.y = Math.max(0.08, Math.min(0.98, state.player.y));
-    if (height * state.player.y + 10 >= state.world.deathWallY) {
-      state.gameOver = true;
-      state.paused = true;
-      state.keys.clear();
-    }
+    if (height * state.player.y + 10 >= state.world.deathWallY) loseLife();
   }
   draw();
   requestAnimationFrame(update);
@@ -535,6 +567,9 @@ function resetRun() {
   state.effects = [];
   state.health = 3;
   state.maxHealth = 3;
+  state.lives = 3;
+  state.maxLives = 3;
+  state.score = 0;
   state.shields = 0;
   state.unlockedWeapons = weaponList.filter(weapon => weapon.unlockedByDefault).map(weapon => weapon.id);
   if (!state.unlockedWeapons.length) state.unlockedWeapons = [weaponList[0].id];
@@ -746,6 +781,8 @@ function saveCurrentRun(slot) {
     controlScheme: state.controlScheme,
     health: state.health,
     maxHealth: state.maxHealth,
+    lives: state.lives,
+    score: state.score,
     shields: state.shields,
     weaponId: state.weaponId,
     unlockedWeapons: [...state.unlockedWeapons],
@@ -782,6 +819,9 @@ function loadRun(slot) {
   state.gameOver = false;
   state.health = Number.isFinite(snapshot.health) ? snapshot.health : 3;
   state.maxHealth = Number.isFinite(snapshot.maxHealth) ? snapshot.maxHealth : 3;
+  state.lives = Number.isFinite(snapshot.lives) ? Math.max(0, Math.min(3, snapshot.lives)) : 3;
+  state.maxLives = 3;
+  state.score = Number.isFinite(snapshot.score) ? Math.max(0, snapshot.score) : 0;
   state.shields = Number.isFinite(snapshot.shields) ? snapshot.shields : 0;
   state.unlockedWeapons = Array.isArray(snapshot.unlockedWeapons) ? snapshot.unlockedWeapons.filter(id => weaponList.some(weapon => weapon.id === id)) : weaponList.filter(weapon => weapon.unlockedByDefault).map(weapon => weapon.id);
   if (!state.unlockedWeapons.length) state.unlockedWeapons = [weaponList[0].id];
