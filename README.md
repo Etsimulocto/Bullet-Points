@@ -2,11 +2,11 @@
 
 An experimental, word-driven endless dungeon crawler and bullet-hell game.
 
-The playfield scrolls upward through a dungeon made from words. The player runs, dodges, and shoots while a kill wall rises from below. The goal is to make the words part of the gameplay: walls, doors, hazards, and enemies all come from editable word feeds.
+The playfield scrolls upward through a dungeon made from words. The player runs, dodges, and shoots while a kill wall rises from below. The words can form walls, doors, hazards, enemies, and pickups.
 
 ## Project status
 
-This repository is a lightweight browser-game scaffold for building on the Raspberry Pi. It has no build system or external dependencies yet. Gameplay and the custom feed editor are next.
+This lightweight browser-game scaffold is set up for building on the Raspberry Pi. It has no build system or external dependencies. The game engine and feed editor are still being built; the JSON files are the editable content/configuration starting point.
 
 ## Run locally
 
@@ -20,16 +20,27 @@ Open `http://localhost:8080` in a browser. To test from a phone on the same Wi-F
 
 ## Current structure
 
-- `index.html` — page shell and game canvas
-- `styles.css` — responsive, paper-like presentation
-- `src/main.js` — canvas startup and input scaffold
-- `data/feeds/default.json` — first editable feed/config
+- `index.html`, `styles.css` — page shell and paper-like presentation
+- `src/main.js` — canvas startup and keyboard movement scaffold
+- `data/settings.json` — colors, scrolling, player, and display settings
+- `data/weapons.json` — weapon list and tuning values
+- `data/pickups.json` — pickup list and effects
+- `data/enemies.json` — enemy list and behavior values
+- `data/obstacles.json` — walls, doors, and collision values
+- `data/word-sets/default.json` — background, wall, door, enemy, and pickup words
+- `data/spawn-patterns.json` — starter enemy and obstacle arrangements
+- `data/menu.json` — menu labels and screen messages
+- `data/feeds/default.json` — manifest selecting the files used by the default feed
+- `data/README.md` — editing notes for the JSON files
 - `docs/GAME_DESIGN.md` — current design direction
+
+## Editing
+
+For normal content changes, edit the matching JSON file under `data/`. For example, change words in `data/word-sets/default.json`, weapon tuning in `data/weapons.json`, or menu text in `data/menu.json`. Keep JSON syntax valid. The editor UI and game-side loading/behavior still need to be implemented.
 
 ## Controls planned
 
-- Keyboard: WASD or arrow keys to move; mouse or keyboard to aim and fire
+- Keyboard: WASD or arrow keys to move; mouse/keyboard to aim and fire
 - Mobile: dual on-screen joysticks, left for movement and right for aiming/firing
-- Display: responsive vertical playfield; invert paper/ink colors
+- Display: responsive vertical playfield with invertible paper/ink colors
 
-Keep the feed data separate from the game code so dungeon words, spawn patterns, speed, and colors can be tuned without editing engine logic.
