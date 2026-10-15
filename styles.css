@@ -259,7 +259,7 @@ body.editor-open .app { width: 100%; min-height: calc(100svh - 24px); margin: 0;
   text-shadow: 2px 2px color-mix(in srgb, var(--accent) 38%, transparent);
   line-height: 1;
 }
-#lives-readout, #score-readout, #depth-readout, #weapon-readout, #pickup-message {
+#lives-readout, #armor-readout, #score-readout, #depth-readout, #weapon-readout, #pickup-message {
   white-space: nowrap;
 }
 #pickup-message { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
