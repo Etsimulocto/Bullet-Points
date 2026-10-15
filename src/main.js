@@ -1,6 +1,17 @@
 const canvas = document.querySelector("#game");
 const context = canvas.getContext("2d");
 const menuButton = document.querySelector("#menu-button");
+const editorToggleButton = document.querySelector("#editor-toggle");
+const editorPanel = document.querySelector("#editor-panel");
+const editorCloseButton = document.querySelector("#editor-close");
+const editorFileSelect = document.querySelector("#editor-file");
+const editorFilePath = document.querySelector("#editor-file-path");
+const editorText = document.querySelector("#editor-text");
+const editorStatus = document.querySelector("#editor-status");
+const editorValidateButton = document.querySelector("#editor-validate");
+const editorSaveButton = document.querySelector("#editor-save");
+const editorDownloadButton = document.querySelector("#editor-download");
+const editorResetButton = document.querySelector("#editor-reset");
 const dialog = document.querySelector("#settings-dialog");
 const resumeButton = document.querySelector("#resume-button");
 const closeMenuButton = document.querySelector("#close-menu");
@@ -17,6 +28,7 @@ const palette = {
 };
 const SLOT_PREFIX = "bulletPoints.saveSlot.";
 const SLOT_COUNT = 3;
+const EDITOR_DRAFT_PREFIX = "bulletPoints.editorDraft.";
 const uiText = {
   title: "PAUSED / SETTINGS",
   pauseSettings: "Ⅱ PAUSE / SETTINGS",
@@ -56,6 +68,10 @@ const uiText = {
   keyboardSelected: "Keyboard and mouse selected.",
   touchSelected: "Dual mobile sticks selected; touch input is a future build step."
 };
+
+let editorDirty = false;
+let editorLoaded = false;
+let editorPath = "";
 
 const state = {
   inverted: false,
@@ -139,6 +155,10 @@ function applyTheme() {
 }
 
 function openSettings() {
+  if (!editorPanel.hidden) {
+    editorPanel.hidden = true;
+    document.body.classList.remove("editor-open");
+  }
   state.paused = true;
   state.keys.clear();
   menuStatus.textContent = "";
@@ -154,6 +174,114 @@ function resumeRun() {
   state.lastTime = 0;
   menuButton.focus();
   draw();
+}
+
+function editorDraftKey(path) {
+  return EDITOR_DRAFT_PREFIX + path;
+}
+
+function setEditorStatus(message) {
+  editorStatus.textContent = message;
+}
+
+async function loadEditorFile(path, allowDiscard = false) {
+  if (editorDirty && !allowDiscard && !window.confirm("Discard unsaved editor changes?")) {
+    editorFileSelect.value = editorPath;
+    return;
+  }
+  editorPath = path;
+  editorFileSelect.value = path;
+  editorFilePath.textContent = path.replace("../", "");
+  editorDirty = false;
+  try {
+    const draft = localStorage.getItem(editorDraftKey(path));
+    if (draft !== null) {
+      editorText.value = draft;
+      setEditorStatus("Loaded your browser-local draft. Save it as a file when ready.");
+      editorLoaded = true;
+      return;
+    }
+  } catch {
+    // Continue by loading the repository version if local storage is unavailable.
+  }
+  try {
+    const response = await fetch(new URL(path, import.meta.url));
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const data = await response.text();
+    JSON.parse(data);
+    editorText.value = JSON.stringify(JSON.parse(data), null, 2);
+    setEditorStatus("Loaded the repository version.");
+    editorLoaded = true;
+  } catch {
+    editorText.value = "";
+    setEditorStatus("Could not load this file. Run the game through the local web server.");
+  }
+}
+
+function parsedEditorData() {
+  try {
+    return JSON.parse(editorText.value);
+  } catch (error) {
+    setEditorStatus("JSON error: " + error.message);
+    return null;
+  }
+}
+
+function toggleEditor(forceOpen) {
+  const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : editorPanel.hidden;
+  if (shouldOpen) {
+    if (dialog.open) dialog.close();
+    state.paused = true;
+    state.keys.clear();
+    editorPanel.hidden = false;
+    document.body.classList.add("editor-open");
+    if (!editorLoaded) loadEditorFile(editorFileSelect.value, true);
+    editorFileSelect.focus();
+  } else {
+    editorPanel.hidden = true;
+    document.body.classList.remove("editor-open");
+    state.paused = dialog.open;
+    state.keys.clear();
+    state.lastTime = 0;
+    menuButton.focus();
+    draw();
+  }
+}
+
+function saveEditorDraft() {
+  if (parsedEditorData() === null) return;
+  try {
+    localStorage.setItem(editorDraftKey(editorPath), editorText.value);
+    editorDirty = false;
+    setEditorStatus("Draft saved in this browser. Download the file to keep or share it.");
+  } catch {
+    setEditorStatus("Browser storage unavailable. Use Download File to keep this edit.");
+  }
+}
+
+function downloadEditorFile() {
+  const parsed = parsedEditorData();
+  if (parsed === null) return;
+  const blob = new Blob([JSON.stringify(parsed, null, 2) + "\n"], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = editorPath.replace("../data/", "").replaceAll("/", "-");
+  link.click();
+  URL.revokeObjectURL(url);
+  editorDirty = false;
+  setEditorStatus("Downloaded " + link.download + ".");
+}
+
+function resetEditorFile() {
+  if (!window.confirm("Remove the local draft and reload this repository file?")) return;
+  try {
+    localStorage.removeItem(editorDraftKey(editorPath));
+  } catch {
+    // The file can still be reloaded even if browser storage is blocked.
+  }
+  editorDirty = false;
+  loadEditorFile(editorPath, true);
 }
 
 function slotKey(slot) {
@@ -294,6 +422,16 @@ async function applyMenuCopy() {
 
 window.addEventListener("resize", resizeCanvas);
 window.addEventListener("keydown", (event) => {
+  if (event.key === "F8") {
+    event.preventDefault();
+    toggleEditor();
+    return;
+  }
+  if (event.key === "Escape" && !editorPanel.hidden) {
+    event.preventDefault();
+    toggleEditor(false);
+    return;
+  }
   if (event.key === "Escape" && dialog.open) {
     event.preventDefault();
     resumeRun();
@@ -313,6 +451,19 @@ window.addEventListener("keyup", (event) => {
 });
 window.addEventListener("blur", () => state.keys.clear());
 
+editorToggleButton.addEventListener("click", () => toggleEditor());
+editorCloseButton.addEventListener("click", () => toggleEditor(false));
+editorFileSelect.addEventListener("change", () => loadEditorFile(editorFileSelect.value));
+editorText.addEventListener("input", () => {
+  editorDirty = true;
+  setEditorStatus("Unsaved edits. Check the JSON before saving your draft.");
+});
+editorValidateButton.addEventListener("click", () => {
+  if (parsedEditorData() !== null) setEditorStatus("JSON is valid.");
+});
+editorSaveButton.addEventListener("click", saveEditorDraft);
+editorDownloadButton.addEventListener("click", downloadEditorFile);
+editorResetButton.addEventListener("click", resetEditorFile);
 menuButton.addEventListener("click", openSettings);
 resumeButton.addEventListener("click", resumeRun);
 closeMenuButton.addEventListener("click", resumeRun);
