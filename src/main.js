@@ -46,6 +46,7 @@ const SLOT_COUNT = 3;
 const EDITOR_DRAFT_PREFIX = "bulletPoints.editorDraft.";
 const roomSettings = {
   scrollSpeed: 42,
+  spawnInterval: 4.2,
   wallWidth: 54,
   glyphSpacing: 26,
   deathWallHeight: 44,
@@ -111,12 +112,13 @@ const weaponList = [{
   shotsPerSecond: 5, projectileSpeed: 560, spreadDegrees: 0, projectilesPerShot: 1, pattern: "single", unlockedByDefault: true
 }];
 let pickupList = [];
+let horizontalWallWords = ["STONE", "BARRIER", "PARAGRAPH", "BLOCK"];
 const state = {
   inverted: false, paused: false, soundEnabled: true, controlScheme: "auto", keys: new Set(),
-  player: { x: 0.5, y: 0.76 }, projectiles: [], beams: [], pickups: [], effects: [],
+  player: { x: 0.5, y: 0.76 }, projectiles: [], beams: [], pickups: [], obstacles: [], effects: [],
   fireCooldown: 0, aim: { x: 0, y: -1 }, gameOver: false,
   health: 3, maxHealth: 3, lives: 3, maxLives: 3, score: 0, shields: 0, weaponId: "period", unlockedWeapons: ["period"],
-  pickupSpawnTimer: 3, runTime: 0, pickupMessage: "", pickupMessageTime: 0,
+  worldSpawnTimer: 1.5, nextWallSide: "left", runTime: 0, pickupMessage: "", pickupMessageTime: 0,
   gamepadPrevDown: false, gamepadNextDown: false,
   world: { scrollOffset: 0, deathWallY: null, distance: 0 }, lastTime: 0,
 };
@@ -409,6 +411,24 @@ function draw() {
     context.fillText(state.pickupMessage, width / 2, height * 0.43);
   }
 
+  state.obstacles.forEach(obstacle => {
+    context.save();
+    context.beginPath();
+    context.rect(obstacle.x, obstacle.y - obstacle.height / 2, obstacle.width, obstacle.height);
+    context.clip();
+    context.fillStyle = color.paper;
+    context.fillRect(obstacle.x, obstacle.y - obstacle.height / 2, obstacle.width, obstacle.height);
+    context.strokeStyle = color.accent;
+    context.lineWidth = 2;
+    context.strokeRect(obstacle.x, obstacle.y - obstacle.height / 2, obstacle.width, obstacle.height);
+    context.fillStyle = color.ink;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.font = "bold 14px Courier New, monospace";
+    context.fillText(obstacle.label, obstacle.x + obstacle.width / 2, obstacle.y);
+    context.restore();
+  });
+
   state.pickups.forEach(pickup => {
     const pulse = 1 + Math.sin(state.runTime * 6 + pickup.y * 0.03) * 0.08;
     context.save();
@@ -502,8 +522,10 @@ function update(time) {
     state.effects = state.effects.map(effect => ({ ...effect, remaining: effect.remaining - dt })).filter(effect => effect.remaining > 0);
     state.pickupMessageTime = Math.max(0, state.pickupMessageTime - dt);
     const controls = readControls();
-    state.player.x += controls.move.x * dt * 0.45;
-    state.player.y += controls.move.y * dt * 0.45;
+    const previousPlayerX = state.player.x;
+    const previousPlayerY = state.player.y;
+    let nextPlayerX = state.player.x + controls.move.x * dt * 0.45;
+    let nextPlayerY = state.player.y + controls.move.y * dt * 0.45;
     if (Math.hypot(controls.aim.x, controls.aim.y) > 0.15) state.aim = controls.aim;
 
     const scrollScale = effectValue("slowScroll", 1);
@@ -513,14 +535,10 @@ function update(time) {
     state.world.distance += dt * scrollStep;
     state.score += Math.floor(state.world.distance / 10) - previousDepth;
 
-    state.pickupSpawnTimer -= dt;
-    if (state.pickupSpawnTimer <= 0 && pickupList.length) {
-      const totalWeight = pickupList.reduce((sum, item) => sum + Math.max(0, Number(item.weight) || 1), 0);
-      let roll = Math.random() * totalWeight;
-      const item = pickupList.find(entry => (roll -= Math.max(0, Number(entry.weight) || 1)) <= 0) || pickupList[0];
-      const margin = Math.min(0.2, roomSettings.wallWidth / Math.max(width, 1) + 0.04);
-      state.pickups.push({ data: item, x: width * (margin + Math.random() * (1 - margin * 2)), y: 18 });
-      state.pickupSpawnTimer = 5 + Math.random() * 4;
+    state.worldSpawnTimer -= dt;
+    if (state.worldSpawnTimer <= 0) {
+      spawnWorldDrop(width);
+      state.worldSpawnTimer = roomSettings.spawnInterval * (0.75 + Math.random() * 0.5);
     }
 
     state.fireCooldown -= dt;
@@ -537,6 +555,27 @@ function update(time) {
       return shot.x >= -20 && shot.x <= width + 20 && shot.y >= -20 && shot.y <= height + 20;
     });
     state.beams = state.beams.map(beam => ({ ...beam, remaining: beam.remaining - dt })).filter(beam => beam.remaining > 0);
+    state.obstacles = state.obstacles.filter(obstacle => {
+      obstacle.y += dt * scrollStep;
+      return obstacle.y < state.world.deathWallY - 12;
+    });
+    const wallMargin = Math.min(0.18, roomSettings.wallWidth / Math.max(width, 1) + 0.025);
+    const minX = wallMargin, maxX = 1 - wallMargin;
+    const minY = 0.08, maxY = 0.98;
+    nextPlayerX = Math.max(minX, Math.min(maxX, nextPlayerX));
+    nextPlayerY = Math.max(minY, Math.min(maxY, nextPlayerY));
+    const nextPx = nextPlayerX * width, nextPy = nextPlayerY * height;
+    if (collidesWithObstacle(nextPx, nextPy)) {
+      const oldPx = previousPlayerX * width, oldPy = previousPlayerY * height;
+      if (!collidesWithObstacle(nextPx, oldPy)) nextPlayerY = previousPlayerY;
+      else if (!collidesWithObstacle(oldPx, nextPy)) nextPlayerX = previousPlayerX;
+      else {
+        const obstacle = collidesWithObstacle(nextPx, nextPy);
+        nextPlayerY = Math.max(minY, (obstacle.y - obstacle.height / 2 - 12) / height);
+      }
+    }
+    state.player.x = nextPlayerX;
+    state.player.y = nextPlayerY;
     const playerX = width * state.player.x, playerY = height * state.player.y;
     state.pickups = state.pickups.filter(pickup => {
       pickup.y += dt * scrollStep;
@@ -547,9 +586,6 @@ function update(time) {
       return pickup.y < state.world.deathWallY - 10;
     });
 
-    const wallMargin = Math.min(0.18, roomSettings.wallWidth / Math.max(width, 1) + 0.025);
-    state.player.x = Math.max(wallMargin, Math.min(1 - wallMargin, state.player.x));
-    state.player.y = Math.max(0.08, Math.min(0.98, state.player.y));
     if (height * state.player.y + 10 >= state.world.deathWallY) loseLife();
   }
   draw();
@@ -564,6 +600,7 @@ function resetRun() {
   state.projectiles = [];
   state.beams = [];
   state.pickups = [];
+  state.obstacles = [];
   state.effects = [];
   state.health = 3;
   state.maxHealth = 3;
@@ -574,7 +611,8 @@ function resetRun() {
   state.unlockedWeapons = weaponList.filter(weapon => weapon.unlockedByDefault).map(weapon => weapon.id);
   if (!state.unlockedWeapons.length) state.unlockedWeapons = [weaponList[0].id];
   state.weaponId = state.unlockedWeapons.includes("period") ? "period" : state.unlockedWeapons[0];
-  state.pickupSpawnTimer = 2.5;
+  state.worldSpawnTimer = 1.5;
+  state.nextWallSide = "left";
   state.runTime = 0;
   state.pickupMessage = "";
   state.pickupMessageTime = 0;
@@ -585,12 +623,59 @@ function resetRun() {
   draw();
 }
 
+async function loadHorizontalWallWords() {
+  try {
+    const response = await fetch(new URL("../data/word-sets/default.json", import.meta.url));
+    if (!response.ok) return;
+    const wordSet = await response.json();
+    if (Array.isArray(wordSet.horizontalWalls) && wordSet.horizontalWalls.length) {
+      horizontalWallWords = wordSet.horizontalWalls.filter(word => typeof word === "string" && word.trim()).map(word => word.trim().toUpperCase());
+    }
+  } catch {
+    // Keep the built-in wall words if the editable word set cannot load.
+  }
+}
+
+function spawnWorldDrop(width) {
+  const roomWidth = Math.max(80, width - roomSettings.wallWidth * 2 - 24);
+  if (pickupList.length && Math.random() < 0.46) {
+    const totalWeight = pickupList.reduce((sum, item) => sum + Math.max(0, Number(item.weight) || 1), 0);
+    let roll = Math.random() * totalWeight;
+    const item = pickupList.find(entry => (roll -= Math.max(0, Number(entry.weight) || 1)) <= 0) || pickupList[0];
+    const left = roomSettings.wallWidth + 12;
+    state.pickups.push({ data: item, x: left + Math.random() * roomWidth, y: -20 });
+    return;
+  }
+
+  const left = roomSettings.wallWidth + 12;
+  const maxWidth = Math.max(0, Math.min(roomWidth * 0.9, roomWidth - 28));
+  const minWidth = Math.min(maxWidth, Math.max(72, roomWidth * 0.32));
+  const barrierWidth = minWidth + Math.random() * Math.max(0, maxWidth - minWidth);
+  const gapSide = state.nextWallSide;
+  const x = gapSide === "left" ? left : left + roomWidth - barrierWidth;
+  const word = horizontalWallWords[Math.floor(Math.random() * horizontalWallWords.length)] || "STONE";
+  context.font = "bold 14px Courier New, monospace";
+  let label = word;
+  while (context.measureText(label).width < barrierWidth - 18) label += " · " + word;
+  state.obstacles.push({ word, label, x, y: -28, width: barrierWidth, height: 26 });
+  state.nextWallSide = gapSide === "left" ? "right" : "left";
+}
+
+function collidesWithObstacle(x, y) {
+  const radius = 10;
+  return state.obstacles.find(obstacle =>
+    x + radius > obstacle.x && x - radius < obstacle.x + obstacle.width &&
+    y + radius > obstacle.y - obstacle.height / 2 && y - radius < obstacle.y + obstacle.height / 2
+  );
+}
+
 async function loadWorldSettings() {
   try {
     const response = await fetch(new URL("../data/settings.json", import.meta.url));
     if (!response.ok) return;
     const settings = await response.json();
     if (Number.isFinite(settings.world?.scrollSpeed)) roomSettings.scrollSpeed = settings.world.scrollSpeed;
+    if (Number.isFinite(settings.world?.spawnInterval)) roomSettings.spawnInterval = Math.max(1.5, settings.world.spawnInterval);
     const room = settings.room || {};
     if (Number.isFinite(room.wallWidth)) roomSettings.wallWidth = room.wallWidth;
     if (Number.isFinite(room.glyphSpacing)) roomSettings.glyphSpacing = room.glyphSpacing;
@@ -827,6 +912,9 @@ function loadRun(slot) {
   if (!state.unlockedWeapons.length) state.unlockedWeapons = [weaponList[0].id];
   state.weaponId = state.unlockedWeapons.includes(snapshot.weaponId) ? snapshot.weaponId : state.unlockedWeapons[0];
   state.pickups = [];
+  state.obstacles = [];
+  state.worldSpawnTimer = 1.5;
+  state.nextWallSide = "left";
   state.effects = [];
   state.inverted = Boolean(snapshot.inverted);
   state.soundEnabled = snapshot.soundEnabled !== false;
@@ -1018,5 +1106,6 @@ applyDeathWallSettings();
 loadControlMap();
 loadCombatData();
 loadWorldSettings();
+loadHorizontalWallWords();
 resizeCanvas();
 requestAnimationFrame(update);
