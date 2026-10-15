@@ -1,5 +1,8 @@
 const canvas = document.querySelector("#game");
 const context = canvas.getContext("2d");
+const catalogContent = document.querySelector("#catalog-content");
+const catalogSummary = document.querySelector("#catalog-summary");
+const catalogRunStatus = document.querySelector("#catalog-run-status");
 const menuButton = document.querySelector("#menu-button");
 const editorToggleButton = document.querySelector("#editor-toggle");
 const editorPanel = document.querySelector("#editor-panel");
@@ -144,6 +147,7 @@ const weaponList = [{
 let pickupList = [];
 let enemyList = [];
 let horizontalWallWords = ["STONE", "BARRIER", "PARAGRAPH", "BLOCK"];
+const catalogData = { enemies: [], weapons: [], pickups: [], obstacles: [], patterns: [], wordSet: {}, settings: {}, controls: {}, menu: {}, feed: {} };
 const state = {
   inverted: false, paused: false, soundEnabled: true, controlScheme: "auto", fontTheme: "dos", keys: new Set(),
   player: { x: 0.5, y: 0.76 }, projectiles: [], beams: [], pickups: [], obstacles: [], effects: [],
@@ -203,6 +207,136 @@ async function loadCombatData() {
     // Keep the built-in Period Pistol if the editable lists cannot load.
   }
 }
+async function loadCatalogData() {
+  const files = [
+    ["../data/enemies.json", "enemies", "enemies"],
+    ["../data/weapons.json", "weapons", "weapons"],
+    ["../data/pickups.json", "pickups", "pickups"],
+    ["../data/obstacles.json", "obstacles", "obstacles"],
+    ["../data/spawn-patterns.json", "patterns", "patterns"],
+    ["../data/word-sets/default.json", "wordSet", null],
+    ["../data/settings.json", "settings", null],
+    ["../data/controls.json", "controls", null],
+    ["../data/menu.json", "menu", null],
+    ["../data/feeds/default.json", "feed", null]
+  ];
+  const results = await Promise.all(files.map(async ([path]) => {
+    try {
+      const response = await fetch(new URL(path, import.meta.url));
+      return response.ok ? await response.json() : null;
+    } catch { return null; }
+  }));
+  files.forEach(([, key, listKey], index) => {
+    const data = results[index];
+    if (!data) return;
+    catalogData[key] = listKey ? (Array.isArray(data[listKey]) ? data[listKey] : []) : data;
+  });
+  renderCatalog();
+}
+
+async function loadStartupContent() {
+  await Promise.all([loadCombatData(), loadCatalogData()]);
+  catalogData.enemies = enemyList;
+  catalogData.weapons = weaponList;
+  catalogData.pickups = pickupList;
+  renderCatalog();
+}
+
+function addCatalogSection(title, items, formatItem) {
+  const section = document.createElement("section");
+  section.className = "catalog-section";
+  const heading = document.createElement("h3");
+  heading.textContent = title + " · " + items.length;
+  const list = document.createElement("ul");
+  list.className = "catalog-list";
+  items.forEach(item => {
+    const row = document.createElement("li");
+    const name = document.createElement("strong");
+    const stats = document.createElement("small");
+    name.textContent = item.name || item.letter || item.id || "Unnamed";
+    stats.textContent = formatItem(item);
+    row.append(name, stats);
+    list.append(row);
+  });
+  section.append(heading, list);
+  catalogContent.append(section);
+}
+
+function addCatalogWordGroup(name, words) {
+  const cleanWords = Array.isArray(words) ? words.filter(word => typeof word === "string" && word.trim()) : [];
+  const section = document.createElement("section");
+  section.className = "catalog-section";
+  const heading = document.createElement("h3");
+  heading.textContent = name.toUpperCase() + " · " + cleanWords.length;
+  const content = document.createElement("p");
+  content.className = "catalog-words";
+  content.textContent = cleanWords.join(" · ");
+  section.append(heading, content);
+  catalogContent.append(section);
+}
+
+function renderCatalog() {
+  if (!catalogContent) return;
+  catalogContent.replaceChildren();
+  const enemies = catalogData.enemies || [];
+  const weapons = catalogData.weapons || [];
+  const pickups = catalogData.pickups || [];
+  const obstacles = catalogData.obstacles || [];
+  const patterns = catalogData.patterns || [];
+  catalogSummary.textContent = `${enemies.length} ENEMIES · ${weapons.length} WEAPONS · ${pickups.length} PICKUPS · ${obstacles.length} OBSTACLES · ${patterns.length} PATTERNS`;
+
+  addCatalogSection("A–Z ENEMIES", enemies, enemy =>
+    `LETTER ${enemy.letter || "?"} · HP ${enemy.health ?? "?"} · SPD ${enemy.speed ?? "?"} · TOUCH ${enemy.contactDamage ?? "?"} · PTS ${enemy.score ?? "?"} · ${String(enemy.behavior || "drift").toUpperCase()} · ${enemy.shoots ? `FIRE ${enemy.fireRate}s / ${enemy.bulletType} ${enemy.bulletDamage}dmg` : "NO FIRE"} · COLOR ${enemy.enemyColor || "?"}`);
+  addCatalogSection("WEAPONS", weapons, weapon =>
+    `DMG ${weapon.damage ?? "?"} · ${weapon.shotsPerSecond ?? "?"}/s · SPEED ${weapon.projectileSpeed ?? "BEAM"} · SPREAD ${weapon.spreadDegrees ?? 0}° · SHOTS ${weapon.projectilesPerShot ?? 1} · ${String(weapon.pattern || "single").toUpperCase()}`);
+  addCatalogSection("PICKUPS", pickups, pickup =>
+    `${pickup.glyph || "?"} · ${pickup.effect || "?"} × ${pickup.amount ?? 1} · ${pickup.durationSeconds || 0}s · WEIGHT ${pickup.weight ?? "?"} · ${pickup.description || ""}`);
+  addCatalogSection("OBSTACLES", obstacles, obstacle =>
+    `${obstacle.wordSet || "wall"} · ${obstacle.collision || "solid"} · HP ${obstacle.health ?? 0} · BREAKS INTO LETTERS ${obstacle.breaksIntoLetters ? "YES" : "NO"}`);
+  addCatalogSection("SPAWN PATTERNS", patterns, pattern =>
+    `${pattern.description || ""} · ${(pattern.entries || []).map(entry => `${entry.count || 1}× ${entry.type}:${entry.id} (gap ${entry.spacing || 0})`).join(" · ")}`);
+
+  const wordSet = catalogData.wordSet || {};
+  addCatalogWordGroup("BACKGROUND WORDS", wordSet.background);
+  addCatalogWordGroup("WALL WORDS", wordSet.walls);
+  addCatalogWordGroup("DOOR WORDS", wordSet.doors);
+  addCatalogWordGroup("ENEMY WORDS", wordSet.enemies);
+  addCatalogWordGroup("PICKUP WORDS", wordSet.pickups);
+  addCatalogWordGroup("DECORATION WORDS", wordSet.decorations);
+  addCatalogWordGroup("HORIZONTAL WALL FEED", wordSet.horizontalWalls);
+
+  const settings = catalogData.settings || {};
+  const world = settings.world || {};
+  const room = settings.room || {};
+  const death = settings.wallOfDeath || {};
+  const control = catalogData.controls || {};
+  const keyboard = control.keyboard || {};
+  const gamepad = control.gamepad || {};
+  addCatalogSection("ROOM & INPUT", [{
+    name: "WORLD",
+    stats: `SCROLL ${world.scrollSpeed ?? "?"}px/s · SPAWN ${world.spawnInterval ?? "?"}s · WALL WIDTH ${room.wallWidth ?? "?"}px · DEATH WALL ${death.height ?? "?"}px · KEYS ${[...(keyboard.moveUp || []), ...(keyboard.moveDown || []), ...(keyboard.moveLeft || []), ...(keyboard.moveRight || [])].join("/")} · PAD LS ${gamepad.moveAxes?.x ?? 0}/${gamepad.moveAxes?.y ?? 1} RS ${gamepad.aimAxes?.x ?? 2}/${gamepad.aimAxes?.y ?? 3}`
+  }], item => item.stats);
+  const feed = catalogData.feed || {};
+  addCatalogSection("FEED FILES", Object.entries(feed.files || {}).map(([name, path]) => ({ name, path })), item => item.path);
+  addCatalogSection("MENU COPY", Object.entries(catalogData.menu || {}).map(([name, value]) => ({ name, value })), item => typeof item.value === "string" ? item.value : JSON.stringify(item.value));
+}
+
+function refreshCatalogFromEditor() {
+  let data;
+  try { data = JSON.parse(editorText.value); } catch { return; }
+  if (editorPath.endsWith("/enemies.json")) catalogData.enemies = data.enemies || [];
+  else if (editorPath.endsWith("/weapons.json")) catalogData.weapons = data.weapons || [];
+  else if (editorPath.endsWith("/pickups.json")) catalogData.pickups = data.pickups || [];
+  else if (editorPath.endsWith("/obstacles.json")) catalogData.obstacles = data.obstacles || [];
+  else if (editorPath.endsWith("/spawn-patterns.json")) catalogData.patterns = data.patterns || [];
+  else if (editorPath.includes("/word-sets/")) catalogData.wordSet = data;
+  else if (editorPath.endsWith("/settings.json")) catalogData.settings = data;
+  else if (editorPath.endsWith("/controls.json")) catalogData.controls = data;
+  else if (editorPath.endsWith("/menu.json")) catalogData.menu = data;
+  else if (editorPath.endsWith("/feeds/default.json")) catalogData.feed = data;
+  renderCatalog();
+}
+
 function getWeapon(id = state.weaponId) {
   return weaponList.find(weapon => weapon.id === id) || weaponList[0];
 }
@@ -545,6 +679,7 @@ function renderHud() {
   pickupMessageReadout.textContent = state.gameOver ? "ERASED · PRESS R TO RESTART" : state.pickupMessageTime > 0 ? state.pickupMessage : "";
   const weapon = getWeapon();
   weaponReadout.textContent = `${weapon.projectileGlyph || "."} ${weapon.name.toUpperCase()}`;
+  catalogRunStatus.textContent = `HP ${Math.ceil(state.health)}/${state.maxHealth} · LIVES ${state.lives} · ARMOR ${state.shields} · PTS ${Math.floor(state.score).toLocaleString()} · ${Math.floor(state.world.distance / 10)}m`;
 }
 
 function createEnemyExplosion(enemy) {
@@ -1540,6 +1675,7 @@ async function loadEditorFile(path, allowDiscard = false) {
         setEditorStatus("Loaded your browser-local draft. Save it as a file when ready.");
         renderEnemyTuner();
         renderSpawnTools();
+        refreshCatalogFromEditor();
         try { refreshEnemyRosterFromEditor(JSON.parse(draft)); } catch {}
         editorLoaded = true;
         return;
@@ -1561,6 +1697,7 @@ async function loadEditorFile(path, allowDiscard = false) {
       : "Loaded the repository version.");
     renderEnemyTuner();
     renderSpawnTools();
+    refreshCatalogFromEditor();
     if (path === "../data/enemies.json") refreshEnemyRosterFromEditor(JSON.parse(data));
     editorLoaded = true;
   } catch {
@@ -1880,6 +2017,7 @@ editorText.addEventListener("input", () => {
     } catch {}
   }
   renderSpawnTools();
+  refreshCatalogFromEditor();
 });
 enemyTunerSelect.addEventListener("change", renderEnemyTuner);
 spawnSelectedButton.addEventListener("click", () => spawnEditorSelection(false));
@@ -1927,7 +2065,7 @@ applyControlScheme();
 applyDeathWallSettings();
 state.player.y = getPlayerStartY();
 loadControlMap();
-loadCombatData();
+loadStartupContent();
 loadWorldSettings();
 loadHorizontalWallWords();
 resizeCanvas();
