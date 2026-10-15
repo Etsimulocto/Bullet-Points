@@ -561,7 +561,7 @@ function defeatEnemy(enemy) {
 }
 
 function damagePlayer(amount) {
-  if (effectValue("wordWall", 0) > 0) return;
+  if (state.effects.some(effect => effect.effect === "wordWall")) return;
   const damage = Math.max(0, Number(amount) || 0);
   if (damage === 0) return;
   if (state.shields > 0) state.shields -= 1;
@@ -638,7 +638,7 @@ function updateEnemySystem(dt, width, height, scrollDelta) {
       enemy.fireCooldown = Math.max(0.25, Number(def.fireRate) || 1.6);
     }
     if (Math.hypot(enemy.x - playerX, enemy.y - playerY) < 22) {
-      if (effectValue("wordWall", 0) > 0) {
+      if (state.effects.some(effect => effect.effect === "wordWall")) {
         createEnemyExplosion(enemy);
         defeatEnemy(enemy);
       } else {
@@ -654,7 +654,7 @@ function updateEnemySystem(dt, width, height, scrollDelta) {
   state.enemyBullets = state.enemyBullets.filter(bullet => {
     bullet.x += bullet.vx * dt;
     bullet.y += bullet.vy * dt;
-    const protectedByWordWall = effectValue("wordWall", 0) > 0 &&
+    const protectedByWordWall = state.effects.some(effect => effect.effect === "wordWall") &&
       Math.abs(bullet.x - playerX) < 30 && Math.abs(bullet.y - playerY) < 26;
     if (protectedByWordWall) return false;
     if (Math.hypot(bullet.x - playerX, bullet.y - playerY) < 14) {
@@ -803,7 +803,7 @@ function draw() {
 
   const px = width * state.player.x;
   const py = height * state.player.y;
-  if (effectValue("wordWall", 0) > 0) {
+  if (state.effects.some(effect => effect.effect === "wordWall")) {
     context.save();
     context.strokeStyle = color.accent;
     context.fillStyle = color.accent;
@@ -935,7 +935,7 @@ function update(time) {
     nextPlayerY = Math.max(minY, Math.min(maxY, nextPlayerY));
     const nextPx = nextPlayerX * width, nextPy = nextPlayerY * height;
     const oldPx = previousPlayerX * width, oldPy = previousPlayerY * height;
-    const protectedByWordWall = effectValue("wordWall", 0) > 0;
+    const protectedByWordWall = state.effects.some(effect => effect.effect === "wordWall");
     const endCollision = protectedByWordWall ? null : collidesWithObstacle(nextPx, nextPy);
     const sweptCollision = protectedByWordWall ? null : state.obstacles.find(obstacle =>
       segmentHitsObstacle(oldPx, oldPy, nextPx, nextPy, obstacle)
