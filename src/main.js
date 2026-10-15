@@ -35,6 +35,12 @@ const healthText = document.querySelector("#health-text");
 const livesReadout = document.querySelector("#lives-readout");
 const scoreReadout = document.querySelector("#score-readout");
 const weaponReadout = document.querySelector("#weapon-readout");
+const fontSelect = document.querySelector("#font-theme");
+const fontThemes = {
+  dos: { canvas: "'Courier New', Courier, monospace" },
+  vga: { canvas: "'Lucida Console', 'DejaVu Sans Mono', monospace" },
+  arcade: { canvas: "'Arial Black', Impact, 'DejaVu Sans Mono', monospace" }
+};
 const controlMap = {keyboard:{moveUp:["w","ArrowUp"],moveDown:["s","ArrowDown"],moveLeft:["a","ArrowLeft"],moveRight:["d","ArrowRight"],aimUp:["i"],aimDown:["k"],aimLeft:["j"],aimRight:["l"],fire:[" "]},gamepad:{deadzone:.18,moveAxes:{x:0,y:1},aimAxes:{x:2,y:3},fireButtons:[0,7],dpad:{up:12,down:13,left:14,right:15}},touch:{deadzone:.12,fireWhileRightStickHeld:true}};
 const input = {pad:null,move:{x:0,y:0},aim:{x:0,y:0},touchMove:{x:0,y:0},touchAim:{x:0,y:0},touchFire:false,mouseAim:{x:0,y:0},mouseFire:false};
 let lastGamepadMessage = "";
@@ -125,7 +131,7 @@ const weaponList = [{
 let pickupList = [];
 let horizontalWallWords = ["STONE", "BARRIER", "PARAGRAPH", "BLOCK"];
 const state = {
-  inverted: false, paused: false, soundEnabled: true, controlScheme: "auto", keys: new Set(),
+  inverted: false, paused: false, soundEnabled: true, controlScheme: "auto", fontTheme: "dos", keys: new Set(),
   player: { x: 0.5, y: 0.76 }, projectiles: [], beams: [], pickups: [], obstacles: [], effects: [],
   fireCooldown: 0, aim: { x: 0, y: -1 }, gameOver: false,
   health: 3, maxHealth: 3, lives: 3, maxLives: 3, score: 0, shields: 0, weaponId: "period", unlockedWeapons: ["period"],
@@ -317,7 +323,12 @@ function handleGamepadUi(dt) {
       if (direction !== gamepadUiState.direction || gamepadUiState.repeatIn <= 0) {
         const controls = Array.from(root.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'))
           .filter(element => element.getClientRects().length > 0);
-        if (controls.length) {
+        if (document.activeElement?.tagName === "SELECT") {
+          const select = document.activeElement;
+          const step = direction === "down" || direction === "right" ? 1 : -1;
+          select.selectedIndex = (select.selectedIndex + step + select.options.length) % select.options.length;
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+        } else if (controls.length) {
           let index = controls.indexOf(document.activeElement);
           if (index < 0) index = 0;
           const step = direction === "down" || direction === "right" ? 1 : -1;
@@ -409,7 +420,7 @@ function drawScrollingSidewall(x, wallWidth, glyphs, color, side) {
   context.fillRect(x, 0, wallWidth, height);
   context.fillStyle = color.ink;
   context.textAlign = "center";
-  context.font = "bold 13px 'Courier New', monospace";
+  setCanvasFont(13, "bold");
   const rows = Math.ceil(height / spacing) + 2;
   for (let row = 0; row < rows; row += 1) {
     const y = -spacing + phase + row * spacing;
@@ -501,7 +512,7 @@ function draw() {
     context.fillStyle = color.ink;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.font = "bold 14px Courier New, monospace";
+    setCanvasFont(14, "bold");
     context.fillText(obstacle.label, obstacle.x + obstacle.width / 2, obstacle.y);
     context.restore();
   });
@@ -521,7 +532,7 @@ function draw() {
     context.fillStyle = color.accent;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.font = "bold 16px 'Courier New', monospace";
+    setCanvasFont(16, "bold");
     context.fillText(pickup.data.glyph || "?", 0, 0);
     context.restore();
   });
@@ -533,7 +544,7 @@ function draw() {
   context.arc(px, py, 10, 0, Math.PI * 2);
   context.fill();
   context.fillStyle = color.paper;
-  context.font = "bold 10px 'Courier New', monospace";
+  setCanvasFont(10, "bold");
   context.textAlign = "center";
   context.textBaseline = "alphabetic";
   context.fillText("@", px, py + 3.5);
@@ -545,7 +556,7 @@ function draw() {
     context.fillStyle = color.accent;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.font = "bold 18px 'Courier New', monospace";
+    setCanvasFont(18, "bold");
     context.fillText(shot.glyph, 0, 0);
     if (shot.glyph === ".") {
       context.globalAlpha = 0.5;
@@ -720,7 +731,7 @@ function spawnWorldDrop(width) {
   const gapSide = state.nextWallSide;
   const x = gapSide === "left" ? left : left + roomWidth - barrierWidth;
   const word = horizontalWallWords[Math.floor(Math.random() * horizontalWallWords.length)] || "STONE";
-  context.font = "bold 14px Courier New, monospace";
+  setCanvasFont(14, "bold");
   let label = word;
   while (context.measureText(label).width < barrierWidth - 18) label += " · " + word;
   state.obstacles.push({ word, label, x, y: -28, width: barrierWidth, height: 26 });
@@ -758,6 +769,21 @@ async function loadWorldSettings() {
 
 function announce(message) {
   menuStatus.textContent = message;
+}
+
+function applyFontTheme(theme, persist = false) {
+  const selected = Object.hasOwn(fontThemes, theme) ? theme : "dos";
+  state.fontTheme = selected;
+  document.documentElement.dataset.gameFont = selected;
+  fontSelect.value = selected;
+  if (persist) {
+    try { localStorage.setItem("bulletPoints.fontTheme", selected); } catch {}
+  }
+  draw();
+}
+
+function setCanvasFont(size, weight = "bold") {
+  context.font = `${weight} ${size}px ${fontThemes[state.fontTheme].canvas}`;
 }
 
 function applyTheme() {
@@ -1055,6 +1081,7 @@ async function applyMenuCopy() {
     document.querySelector("#display-heading").textContent = uiText.displayHeading;
     document.querySelector("#ink-label").textContent = uiText.inkLabel;
     document.querySelector("#sound-label").textContent = uiText.soundLabel;
+    document.querySelector("#font-label").textContent = uiText.fontLabel || "Game font";
     document.querySelector("#sound-note").textContent = uiText.soundNote;
     document.querySelector("#controls-heading").textContent = uiText.controlsHeading;
     document.querySelector("#auto-label").textContent = uiText.auto;
@@ -1147,6 +1174,7 @@ invertButton.addEventListener("click", () => {
   state.inverted = !state.inverted;
   applyTheme();
 });
+fontSelect.addEventListener("change", () => applyFontTheme(fontSelect.value, true));
 soundToggle.addEventListener("change", () => {
   state.soundEnabled = soundToggle.checked;
   announce(state.soundEnabled ? uiText.soundEnabled : uiText.soundMuted);
@@ -1167,6 +1195,7 @@ restartButton.addEventListener("click", () => {
 
 renderSaveSlots();
 applyMenuCopy();
+try { applyFontTheme(localStorage.getItem("bulletPoints.fontTheme") || "dos"); } catch { applyFontTheme("dos"); }
 applyControlScheme();
 applyDeathWallSettings();
 state.player.y = getPlayerStartY();
