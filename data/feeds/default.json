@@ -10,6 +10,7 @@
     "obstacles": "../obstacles.json",
     "wordSets": "../word-sets/default.json",
     "spawnPatterns": "../spawn-patterns.json",
-    "menu": "../menu.json"
+    "menu": "../menu.json",
+    "controls": "../controls.json"
   }
 }
