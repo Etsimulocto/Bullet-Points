@@ -11,7 +11,10 @@ These JSON files are meant to be easy to edit with a text editor. Keep the JSON 
 - `obstacles.json` — walls, doors, and collision behavior
 - `word-sets/default.json` — the words used by the starter feed
 - `spawn-patterns.json` — groups and arrangements of enemies or obstacles
-- `menu.json` — menu button labels and other screen text
+- `menu.json` — menu button labels and settings-menu wording, including slot actions
 - `feeds/default.json` — selects which files a feed uses
 
 The content schemas are starter formats. They describe editable data; the game engine still needs to load and apply them. Behavior names such as `chase` or `restoreHealth` are identifiers, not code you should need to edit for routine tuning.
+
+
+The settings dialog reads its button and status wording from `menu.json`. Three browser-local save slots currently preserve the scaffold player's position and settings; expand the save snapshot when game progress is added.
