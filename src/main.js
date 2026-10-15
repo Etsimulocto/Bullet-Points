@@ -20,6 +20,13 @@ const soundToggle = document.querySelector("#sound-toggle");
 const slotList = document.querySelector("#save-slots");
 const menuStatus = document.querySelector("#menu-status");
 const restartButton = document.querySelector("#restart-button");
+const gamepadStatus = document.querySelector("#gamepad-status");
+const leftStick = document.querySelector("#left-stick"), rightStick = document.querySelector("#right-stick");
+const leftStickKnob = document.querySelector("#left-stick-knob"), rightStickKnob = document.querySelector("#right-stick-knob");
+const touchSticks = document.querySelector("#touch-sticks"), app = document.querySelector(".app");
+const controlMap = {keyboard:{moveUp:["w","ArrowUp"],moveDown:["s","ArrowDown"],moveLeft:["a","ArrowLeft"],moveRight:["d","ArrowRight"],aimUp:["i"],aimDown:["k"],aimLeft:["j"],aimRight:["l"],fire:[" "]},gamepad:{deadzone:.18,moveAxes:{x:0,y:1},aimAxes:{x:2,y:3},fireButtons:[0,7],dpad:{up:12,down:13,left:14,right:15}},touch:{deadzone:.12,fireWhileRightStickHeld:true}};
+const input = {pad:null,move:{x:0,y:0},aim:{x:0,y:0},touchMove:{x:0,y:0},touchAim:{x:0,y:0},touchFire:false,mouseAim:{x:0,y:0},mouseFire:false};
+let lastGamepadMessage = "";
 
 const palette = {
   paper: "#f4f0e6",
@@ -50,8 +57,15 @@ const uiText = {
   soundNote: "(ready for audio)",
   controlsHeading: "CONTROLS",
   keyboard: "Keyboard and mouse",
+  auto: "Auto: use any active input",
+  keyboard: "Keyboard and mouse",
+  gamepad: "Gamepad",
   touch: "Dual mobile sticks",
-  touchNote: "(input support is planned)",
+  touchNote: "(left moves · right aims and fires)",
+  gamepadStatus: "Looking for a connected controller…",
+  noGamepad: "No controller detected. Connect one, then press a button.",
+  gamepadConnected: "Connected: ",
+  gamepadUnsupported: "Gamepad API unavailable in this browser.",
   saveSlots: "SAVE SLOTS",
   storageNote: "Stored in this browser",
   slotName: "SAVE SLOT {slot}",
@@ -74,8 +88,10 @@ const uiText = {
   restartSuccess: "Run restarted.",
   soundEnabled: "Sound effects enabled.",
   soundMuted: "Sound effects muted.",
+  autoSelected: "Auto controls enabled.",
   keyboardSelected: "Keyboard and mouse selected.",
-  touchSelected: "Dual mobile sticks selected; touch input is a future build step."
+  gamepadSelected: "Gamepad selected.",
+  touchSelected: "Dual mobile sticks selected."
 };
 
 let editorDirty = false;
@@ -86,14 +102,79 @@ const state = {
   inverted: false,
   paused: false,
   soundEnabled: true,
-  controlScheme: "keyboard",
+  controlScheme: "auto",
   keys: new Set(),
   player: { x: 0.5, y: 0.76 },
+  projectiles: [],
+  fireCooldown: 0,
+  aim: { x: 0, y: -1 },
   gameOver: false,
   world: { scrollOffset: 0, deathWallY: null, distance: 0 },
   lastTime: 0,
 };
 
+async function loadControlMap() {
+  try {
+    const response = await fetch(new URL("../data/controls.json", import.meta.url));
+    if (!response.ok) return;
+    const config = await response.json();
+    Object.assign(controlMap.keyboard, config.keyboard || {});
+    Object.assign(controlMap.gamepad, config.gamepad || {});
+    Object.assign(controlMap.touch, config.touch || {});
+  } catch {}
+}
+function applyControlScheme() {
+  app.classList.toggle("touch-mode", state.controlScheme === "touch");
+  touchSticks.hidden = state.controlScheme !== "touch" && !matchMedia("(pointer: coarse)").matches;
+}
+function deadzone(value, zone) {
+  return Math.abs(value) < zone ? 0 : Math.sign(value) * (Math.abs(value) - zone) / (1 - zone);
+}
+function pollGamepad() {
+  if (!navigator.getGamepads) {
+    input.pad = null;
+    gamepadStatus.textContent = "Gamepad API unavailable in this browser.";
+    return;
+  }
+  input.pad = Array.from(navigator.getGamepads() || []).find(p => p && p.connected) || null;
+  const pad = input.pad, cfg = controlMap.gamepad;
+  const status = pad ? "Connected: " + pad.id : "No controller detected. Connect one, then press a button.";
+  if (status !== lastGamepadMessage) { lastGamepadMessage = status; gamepadStatus.textContent = status; }
+  if (!pad) { input.move = {x:0,y:0}; input.aim = {x:0,y:0}; return; }
+  const ax = i => Number.isFinite(pad.axes[i]) ? pad.axes[i] : 0;
+  const down = i => Boolean(pad.buttons[i]?.pressed);
+  input.move = {x:deadzone(ax(cfg.moveAxes.x),cfg.deadzone)+Number(down(cfg.dpad.right))-Number(down(cfg.dpad.left)),y:deadzone(ax(cfg.moveAxes.y),cfg.deadzone)+Number(down(cfg.dpad.down))-Number(down(cfg.dpad.up))};
+  input.aim = {x:deadzone(ax(cfg.aimAxes.x),cfg.deadzone),y:deadzone(ax(cfg.aimAxes.y),cfg.deadzone)};
+}
+function keyAxis(negative, positive) {
+  return Number(positive.some(k => state.keys.has(k))) - Number(negative.some(k => state.keys.has(k)));
+}
+function readControls() {
+  pollGamepad();
+  const scheme=state.controlScheme, kb=controlMap.keyboard;
+  const useK=scheme==="auto"||scheme==="keyboard", useG=scheme==="auto"||scheme==="gamepad", useT=scheme==="auto"||scheme==="touch";
+  let move={x:(useK?keyAxis(kb.moveLeft,kb.moveRight):0)+(useG?input.move.x:0)+(useT?input.touchMove.x:0),y:(useK?keyAxis(kb.moveUp,kb.moveDown):0)+(useG?input.move.y:0)+(useT?input.touchMove.y:0)};
+  const m=Math.hypot(move.x,move.y); if(m>1) move={x:move.x/m,y:move.y/m};
+  const keyAim=useK?{x:keyAxis(kb.aimLeft,kb.aimRight),y:keyAxis(kb.aimUp,kb.aimDown)}:{x:0,y:0};
+  const aim=[useT?input.touchAim:null,useG?input.aim:null,keyAim,useK?input.mouseAim:null].find(v=>v&&Math.hypot(v.x,v.y)>.15)||{x:0,y:-1};
+  const fire=(useK&&(kb.fire||[]).some(k=>state.keys.has(k)|| (k===" "&&state.keys.has(" "))))||(useK&&input.mouseFire)||(useG&&input.pad&&(controlMap.gamepad.fireButtons||[]).some(i=>input.pad.buttons[i]?.pressed))||(useT&&input.touchFire&&controlMap.touch.fireWhileRightStickHeld);
+  return {move,aim,fire};
+}
+function setStick(stick, knob, point) {
+  const r=Math.min(stick.clientWidth,stick.clientHeight)*.34, box=stick.getBoundingClientRect();
+  let x=point.clientX-(box.left+box.width/2), y=point.clientY-(box.top+box.height/2), d=Math.hypot(x,y), scale=d>r?r/d:1;
+  x=x*scale/r; y=y*scale/r;
+  if(Math.hypot(x,y)<(controlMap.touch.deadzone||.12)) x=y=0;
+  knob.style.transform="translate("+x*r+"px,"+y*r+"px)";
+  return {x,y};
+}
+function bindStick(stick,knob,type) {
+  let active=null;
+  const release=e=>{if(active!==null&&e.pointerId!==active)return; active=null; stick.classList.remove("is-active"); knob.style.transform="translate(0,0)"; if(type==="move")input.touchMove={x:0,y:0};else{input.touchAim={x:0,y:0};input.touchFire=false;}};
+  stick.addEventListener("pointerdown",e=>{if(!["auto","touch"].includes(state.controlScheme))return;e.preventDefault();active=e.pointerId;stick.setPointerCapture(active);stick.classList.add("is-active");const v=setStick(stick,knob,e);if(type==="move")input.touchMove=v;else{input.touchAim=v;input.touchFire=true;}});
+  stick.addEventListener("pointermove",e=>{if(e.pointerId!==active)return;const v=setStick(stick,knob,e);if(type==="move")input.touchMove=v;else{input.touchAim=v;input.touchFire=true;}});
+  ["pointerup","pointercancel","lostpointercapture"].forEach(t=>stick.addEventListener(t,release));
+}
 function resizeCanvas() {
   const bounds = canvas.getBoundingClientRect();
   const scale = window.devicePixelRatio || 1;
@@ -204,6 +285,9 @@ function draw() {
   context.fillStyle = color.paper;
   context.font = "bold 10px 'Courier New', monospace";
   context.fillText("@", px, py + 3.5);
+  context.fillStyle = color.accent;
+  context.font = "bold 17px 'Courier New', monospace";
+  state.projectiles.forEach(shot => context.fillText("•", shot.x, shot.y));
 
   if (state.gameOver) {
     context.fillStyle = state.inverted ? "rgb(0 0 0 / 72%)" : "rgb(244 240 230 / 82%)";
@@ -224,12 +308,13 @@ function update(time) {
   if (state.world.deathWallY === null) state.world.deathWallY = height * 1.25;
 
   if (!state.paused && !state.gameOver) {
-    const horizontalSpeed = dt * 0.45;
-    const verticalSpeed = dt * 0.11;
-    if (state.keys.has("ArrowLeft") || state.keys.has("a")) state.player.x -= horizontalSpeed;
-    if (state.keys.has("ArrowRight") || state.keys.has("d")) state.player.x += horizontalSpeed;
-    if (state.keys.has("ArrowUp") || state.keys.has("w")) state.player.y -= verticalSpeed;
-    if (state.keys.has("ArrowDown") || state.keys.has("s")) state.player.y += verticalSpeed;
+    const controls = readControls();
+    state.player.x += controls.move.x * dt * 0.45;
+    state.player.y += controls.move.y * dt * 0.45;
+    if (Math.hypot(controls.aim.x,controls.aim.y)>.15) state.aim=controls.aim;
+    state.fireCooldown -= dt;
+    if(controls.fire&&state.fireCooldown<=0){const mag=Math.hypot(state.aim.x,state.aim.y)||1;state.projectiles.push({x:width*state.player.x,y:height*state.player.y,vx:state.aim.x/mag*440,vy:state.aim.y/mag*440});state.fireCooldown=.16;}
+    state.projectiles=state.projectiles.filter(shot=>{shot.x+=shot.vx*dt;shot.y+=shot.vy*dt;return shot.x>=0&&shot.x<=width&&shot.y>=0&&shot.y<=height;});
 
     const wallMargin = Math.min(0.18, roomSettings.wallWidth / Math.max(width, 1) + 0.025);
     state.player.x = Math.max(wallMargin, Math.min(1 - wallMargin, state.player.x));
@@ -253,6 +338,8 @@ function resetRun() {
   state.player = { x: 0.5, y: 0.76 };
   state.world = { scrollOffset: 0, deathWallY: height * roomSettings.startHeightRatio, distance: 0 };
   state.gameOver = false;
+  state.projectiles = [];
+  state.fireCooldown = 0;
   state.paused = dialog.open || !editorPanel.hidden;
   state.keys.clear();
   state.lastTime = 0;
@@ -485,9 +572,10 @@ function loadRun(slot) {
   state.gameOver = false;
   state.inverted = Boolean(snapshot.inverted);
   state.soundEnabled = snapshot.soundEnabled !== false;
-  state.controlScheme = snapshot.controlScheme === "touch" ? "touch" : "keyboard";
+  state.controlScheme = ["auto","keyboard","gamepad","touch"].includes(snapshot.controlScheme) ? snapshot.controlScheme : "auto";
   soundToggle.checked = state.soundEnabled;
   document.querySelector('input[name="control-scheme"][value="' + state.controlScheme + '"]').checked = true;
+  applyControlScheme();
   applyTheme();
   announce(uiText.loadSuccess + slot + ".");
 }
@@ -557,7 +645,9 @@ async function applyMenuCopy() {
     document.querySelector("#sound-label").textContent = uiText.soundLabel;
     document.querySelector("#sound-note").textContent = uiText.soundNote;
     document.querySelector("#controls-heading").textContent = uiText.controlsHeading;
+    document.querySelector("#auto-label").textContent = uiText.auto;
     document.querySelector("#keyboard-label").textContent = uiText.keyboard;
+    document.querySelector("#gamepad-label").textContent = uiText.gamepad;
     document.querySelector("#touch-label").textContent = uiText.touch;
     document.querySelector("#touch-note").textContent = uiText.touchNote;
     document.querySelector("#slots-heading").textContent = uiText.saveSlots;
@@ -570,7 +660,17 @@ async function applyMenuCopy() {
   }
 }
 
-window.addEventListener("resize", resizeCanvas);
+bindStick(leftStick,leftStickKnob,"move");
+bindStick(rightStick,rightStickKnob,"aim");
+window.addEventListener("resize",()=>{applyControlScheme();resizeCanvas();});
+canvas.addEventListener("pointermove",e=>{
+  if(e.pointerType==="touch"||["gamepad","touch"].includes(state.controlScheme))return;
+  const b=canvas.getBoundingClientRect(),dx=e.clientX-b.left-b.width*state.player.x,dy=e.clientY-b.top-b.height*state.player.y,len=Math.hypot(dx,dy);
+  if(len>8)input.mouseAim={x:dx/len,y:dy/len};
+});
+canvas.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse"&&["auto","keyboard"].includes(state.controlScheme))input.mouseFire=true;});
+window.addEventListener("pointerup",e=>{if(e.pointerType==="mouse")input.mouseFire=false;});
+window.addEventListener("blur",()=>{state.keys.clear();input.mouseFire=false;input.touchFire=false;input.touchMove={x:0,y:0};input.touchAim={x:0,y:0};});
 window.addEventListener("keydown", (event) => {
   if (event.key === "F8") {
     event.preventDefault();
@@ -639,7 +739,8 @@ document.querySelectorAll('input[name="control-scheme"]').forEach((radio) => {
   radio.addEventListener("change", () => {
     if (!radio.checked) return;
     state.controlScheme = radio.value;
-    announce(radio.value === "touch" ? uiText.touchSelected : uiText.keyboardSelected);
+    applyControlScheme();
+    announce(({auto:uiText.autoSelected,keyboard:uiText.keyboardSelected,gamepad:uiText.gamepadSelected,touch:uiText.touchSelected})[radio.value]);
   });
 });
 restartButton.addEventListener("click", () => {
@@ -650,6 +751,8 @@ restartButton.addEventListener("click", () => {
 
 renderSaveSlots();
 applyMenuCopy();
+applyControlScheme();
+loadControlMap();
 loadWorldSettings();
 resizeCanvas();
 requestAnimationFrame(update);
