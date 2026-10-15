@@ -6,7 +6,7 @@ The playfield scrolls upward through a dungeon made from words. The player runs,
 
 ## Project status
 
-This lightweight browser-game scaffold is set up for building on the Raspberry Pi. It has no build system or external dependencies. The room-scroll scaffold moves distinct letter and symbol sidewalls downward and brings the Wall of Death up from below. Room speed, wall glyphs, and wall width load from `data/settings.json`. If it catches the player, press **R** or use **Restart Run** in the pause menu.
+This lightweight browser-game scaffold is set up for building on the Raspberry Pi. It has no build system or external dependencies. The room-scroll scaffold moves distinct letter and symbol sidewalls downward while a fixed, two-line Wall of Death marks the bottom edge. Room speed, wall glyphs, wall width, and the death wall’s height and text load from `data/settings.json`. If it catches the player, press **R** or use **Restart Run** in the pause menu.
 
 ## Run locally
 
