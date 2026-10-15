@@ -31,6 +31,95 @@
       "collision": "passable",
       "health": 0,
       "requiresKey": false
+    },
+    {
+      "id": "equation-black-hole",
+      "type": "number",
+      "name": "EQUATION · BLACK HOLE",
+      "equation": "8 ÷ 0 = ∞",
+      "behavior": "suction-hold",
+      "triggerRadius": 165,
+      "captureRadius": 30,
+      "suctionSpeed": 360,
+      "suctionSeconds": 0.7,
+      "holdSeconds": 1.8,
+      "cooldownSeconds": 3.5,
+      "color": "#8b5cf6"
+    },
+    {
+      "id": "equation-wall-slam",
+      "type": "number",
+      "name": "EQUATION · SLAM",
+      "equation": "13² = 169",
+      "behavior": "wall-slam",
+      "triggerRadius": 145,
+      "captureRadius": 34,
+      "suctionSpeed": 300,
+      "suctionSeconds": 0.65,
+      "holdSeconds": 0.6,
+      "wallHoldSeconds": 1.5,
+      "slamSpeed": 720,
+      "launchSpeed": 540,
+      "pinballSeconds": 1.6,
+      "directions": [
+        "left",
+        "right",
+        "up",
+        "down"
+      ],
+      "color": "#ff4d6d"
+    },
+    {
+      "id": "equation-pinball",
+      "type": "number",
+      "name": "EQUATION · PINBALL",
+      "equation": "√−1 = i",
+      "behavior": "pinball",
+      "triggerRadius": 135,
+      "captureRadius": 32,
+      "suctionSpeed": 330,
+      "suctionSeconds": 0.55,
+      "holdSeconds": 0.4,
+      "launchSpeed": 660,
+      "pinballSeconds": 2.8,
+      "cooldownSeconds": 3,
+      "color": "#00a6fb"
+    },
+    {
+      "id": "equation-repulsor",
+      "type": "number",
+      "name": "EQUATION · REPULSOR",
+      "equation": "−(−7) = +7",
+      "behavior": "repulsor",
+      "triggerRadius": 155,
+      "suctionSpeed": 520,
+      "suctionSeconds": 1.15,
+      "holdSeconds": 0,
+      "cooldownSeconds": 3,
+      "color": "#ffb703"
+    },
+    {
+      "id": "equation-chaos",
+      "type": "number",
+      "name": "EQUATION · CHAOS",
+      "equation": "0 ÷ 0 = ?",
+      "behavior": "wall-slam",
+      "triggerRadius": 180,
+      "captureRadius": 28,
+      "suctionSpeed": 420,
+      "suctionSeconds": 0.5,
+      "holdSeconds": 0.35,
+      "wallHoldSeconds": 0.7,
+      "slamSpeed": 900,
+      "launchSpeed": 720,
+      "pinballSeconds": 3.2,
+      "directions": [
+        "left",
+        "right",
+        "up",
+        "down"
+      ],
+      "color": "#fb5607"
     }
   ]
 }
