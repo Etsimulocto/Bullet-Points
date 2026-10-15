@@ -146,6 +146,14 @@ body.editor-open .app { width: 100%; min-height: calc(100svh - 24px); margin: 0;
 .editor-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .editor-actions button { min-height: 38px; padding: 7px; cursor: pointer; font-size: 10px; font-weight: bold; }
 .editor-actions button:hover { background: var(--ink); color: var(--paper); }
+.spawn-tools { display: grid; gap: 6px; padding: 9px; border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--paper)); }
+.spawn-tools[hidden] { display: none; }
+.spawn-tools h3 { margin: 0; font-size: 13px; letter-spacing: .06em; }
+.spawn-tools > label { font-size: 9px; font-weight: bold; letter-spacing: .08em; }
+.spawn-tools-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.spawn-tools button { min-height: 34px; padding: 6px; border: 1px solid var(--ink); border-radius: 0; background: var(--paper); color: var(--ink); font: inherit; font-size: 10px; font-weight: bold; cursor: pointer; }
+.spawn-tools button:hover { background: var(--ink); color: var(--paper); }
+#spawn-tools-help { margin: 0; font-size: 9px; line-height: 1.35; opacity: .72; }
 .editor-status { min-height: 2.8em; }
 .editor-shortcut { opacity: .6; }
 #editor-toggle { white-space: nowrap; }
