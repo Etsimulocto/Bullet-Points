@@ -1,0 +1,34 @@
+{
+  "enemies": [
+    {
+      "id": "mimic",
+      "name": "MIMIC",
+      "wordSet": "enemies",
+      "health": 2,
+      "speed": 36,
+      "behavior": "drift",
+      "contactDamage": 1,
+      "score": 10
+    },
+    {
+      "id": "error",
+      "name": "ERROR",
+      "wordSet": "enemies",
+      "health": 1,
+      "speed": 70,
+      "behavior": "charge",
+      "contactDamage": 1,
+      "score": 15
+    },
+    {
+      "id": "hunger",
+      "name": "HUNGER",
+      "wordSet": "enemies",
+      "health": 4,
+      "speed": 24,
+      "behavior": "chase",
+      "contactDamage": 1,
+      "score": 30
+    }
+  ]
+}
