@@ -1976,7 +1976,7 @@ canvas.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse"&&["auto","k
 window.addEventListener("pointerup",e=>{if(e.pointerType==="mouse")input.mouseFire=false;});
 window.addEventListener("blur",()=>{state.keys.clear();input.mouseFire=false;input.touchFire=false;input.touchMove={x:0,y:0};input.touchAim={x:0,y:0};});
 window.addEventListener("keydown", (event) => {
-  if (event.key === "F6" && window.matchMedia("(min-width: 901px)").matches && !event.target.matches("input, textarea, select, [contenteditable='true']")) {
+  if (event.key === "F6" && window.matchMedia("(min-width: 901px)").matches) {
     event.preventDefault();
     toggleCatalogPanel();
     return;
