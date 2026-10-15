@@ -1239,8 +1239,6 @@ async function loadEditorFile(path, allowDiscard = false) {
       setEditorStatus("Loaded your browser-local draft. Save it as a file when ready.");
       renderEnemyTuner();
       try { refreshEnemyRosterFromEditor(JSON.parse(draft)); } catch {}
-      renderEnemyTuner();
-      refreshEnemyRosterFromEditor(JSON.parse(draft));
       editorLoaded = true;
       return;
     }
@@ -1256,13 +1254,10 @@ async function loadEditorFile(path, allowDiscard = false) {
     setEditorStatus("Loaded the repository version.");
     renderEnemyTuner();
     if (path === "../data/enemies.json") refreshEnemyRosterFromEditor(JSON.parse(data));
-    renderEnemyTuner();
-    if (path === "../data/enemies.json") refreshEnemyRosterFromEditor(JSON.parse(data));
     editorLoaded = true;
   } catch {
     editorText.value = "";
     setEditorStatus("Could not load this file. Run the game through the local web server.");
-    renderEnemyTuner();
     renderEnemyTuner();
   }
 }
