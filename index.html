@@ -135,6 +135,21 @@
       <option value="../data/feeds/default.json">Feed manifest</option>
     </select>
     <p id="editor-file-path" class="editor-file-path"></p>
+    <section id="enemy-tuner" class="enemy-tuner" aria-labelledby="enemy-tuner-title" hidden>
+      <h3 id="enemy-tuner-title">A–Z ENEMY TUNER</h3>
+      <label for="enemy-tuner-select">CHOOSE ENEMY</label>
+      <select id="enemy-tuner-select" aria-label="Choose an enemy to tune"></select>
+      <div class="enemy-preview">
+        <span id="enemy-preview-letter">A</span>
+        <strong id="enemy-preview-name">Artic Arganon</strong>
+      </div>
+      <div id="enemy-tuner-fields" class="enemy-tuner-fields"></div>
+      <div class="explosion-preview-wrap">
+        <small>LETTER BURST PREVIEW</small>
+        <div id="explosion-preview" class="explosion-preview">A A A A A A A A</div>
+      </div>
+      <p class="enemy-tuner-help">Changes apply live. Use SAVE DRAFT or DOWNLOAD FILE to keep the roster.</p>
+    </section>
     <textarea id="editor-text" spellcheck="false" aria-label="Selected JSON data file"></textarea>
     <div class="editor-actions">
       <button id="editor-validate" type="button">CHECK JSON</button>
