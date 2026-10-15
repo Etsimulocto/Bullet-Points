@@ -13,6 +13,12 @@ const editorSaveButton = document.querySelector("#editor-save");
 const editorDownloadButton = document.querySelector("#editor-download");
 const editorResetButton = document.querySelector("#editor-reset");
 const enemyTuner = document.querySelector("#enemy-tuner");
+const spawnTools = document.querySelector("#spawn-tools");
+const spawnItemSelect = document.querySelector("#spawn-item-select");
+const spawnSelectedButton = document.querySelector("#spawn-selected");
+const spawnAllButton = document.querySelector("#spawn-all");
+const spawnToolsTitle = document.querySelector("#spawn-tools-title");
+const spawnToolsHelp = document.querySelector("#spawn-tools-help");
 const enemyTunerSelect = document.querySelector("#enemy-tuner-select");
 const enemyTunerFields = document.querySelector("#enemy-tuner-fields");
 const enemyPreviewLetter = document.querySelector("#enemy-preview-letter");
@@ -1029,21 +1035,28 @@ async function loadHorizontalWallWords() {
   }
 }
 
+function spawnEnemyData(data, x, y) {
+  if (!data) return false;
+  state.enemies.push({
+    id: data.id || String(data.letter || "test").toLowerCase(),
+    letter: data.letter || String(data.id || "?").charAt(0).toUpperCase(),
+    data,
+    x, y,
+    originX: x, phase: Math.random() * Math.PI * 2,
+    age: 0, direction: Math.random() < 0.5 ? -1 : 1, angle: Math.random() * Math.PI * 2,
+    health: Math.max(1, Number(data.health) || 1),
+    fireCooldown: Math.random() * Math.max(0.4, Number(data.fireRate) || 1.5)
+  });
+  return true;
+}
+
 function spawnEnemy(width) {
   if (!enemyList.length || state.enemies.length >= 5) return;
   const data = enemyList[state.enemySpawnIndex % enemyList.length];
   state.enemySpawnIndex += 1;
   const left = roomSettings.wallWidth + 18;
   const right = Math.max(left + 1, width - roomSettings.wallWidth - 18);
-  const spawnX = left + Math.random() * (right - left);
-  state.enemies.push({
-    id: data.id, letter: data.letter, data,
-    x: spawnX, y: -24,
-    originX: spawnX, phase: Math.random() * Math.PI * 2,
-    age: 0, direction: Math.random() < 0.5 ? -1 : 1, angle: Math.random() * Math.PI * 2,
-    health: Math.max(1, Number(data.health) || 1),
-    fireCooldown: Math.random() * Math.max(0.4, Number(data.fireRate) || 1.5)
-  });
+  spawnEnemyData(data, left + Math.random() * (right - left), -24);
 }
 
 function spawnWorldDrop(width) {
@@ -1219,6 +1232,144 @@ function refreshEnemyRosterFromEditor(data) {
       enemy.health = Math.min(enemy.health, Math.max(1, Number(updated.health) || 1));
     }
   });
+}
+
+function spawnToolCollection(path, data) {
+  if (path.endsWith("/enemies.json")) return { kind: "enemies", label: "ENEMIES", items: data.enemies || [] };
+  if (path.endsWith("/pickups.json")) return { kind: "pickups", label: "PICKUPS", items: data.pickups || [] };
+  if (path.endsWith("/weapons.json")) return { kind: "weapons", label: "WEAPONS", items: data.weapons || [] };
+  if (path.endsWith("/obstacles.json")) return { kind: "obstacles", label: "OBSTACLES", items: data.obstacles || [] };
+  if (path.includes("/word-sets/")) return { kind: "words", label: "HORIZONTAL WALL WORDS", items: (data.horizontalWalls || []).map((word, index) => ({ id: String(index), name: word })) };
+  if (path.endsWith("/spawn-patterns.json")) return { kind: "patterns", label: "SPAWN PATTERNS", items: data.patterns || [] };
+  if (path.endsWith("/feeds/default.json")) return { kind: "feed", label: "FULL FEED", items: [{ id: "full-feed", name: "Everything in First Page" }] };
+  return null;
+}
+
+function renderSpawnTools() {
+  let data;
+  try { data = JSON.parse(editorText.value); } catch { spawnTools.hidden = true; return; }
+  const collection = spawnToolCollection(editorPath, data);
+  if (!collection || !collection.items.length) { spawnTools.hidden = true; return; }
+  spawnTools.hidden = false;
+  spawnToolsTitle.textContent = "LIVE SPAWNER · " + collection.label;
+  const previousValue = spawnItemSelect.value;
+  spawnItemSelect.replaceChildren();
+  collection.items.forEach((item, index) => {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = item.letter
+      ? item.letter + " · " + (item.name || "Unnamed enemy")
+      : (item.name || item.id || "Entry " + (index + 1));
+    spawnItemSelect.append(option);
+  });
+  if (Number(previousValue) < collection.items.length) spawnItemSelect.value = previousValue;
+  spawnSelectedButton.textContent = collection.kind === "patterns" ? "SPAWN PATTERN" : collection.kind === "feed" ? "SPAWN EVERYTHING" : "SPAWN SELECTED";
+  spawnAllButton.hidden = collection.kind === "feed";
+  spawnAllButton.textContent = collection.kind === "words" ? "SPAWN 10 WORDS" : "SPAWN ALL (" + collection.items.length + ")";
+  spawnToolsHelp.textContent = "Adds test objects to the live canvas. The run resumes when F8 closes.";
+}
+
+function spawnTestObstacle(word, width, y, index = 0) {
+  const left = roomSettings.wallWidth + 12;
+  const roomWidth = Math.max(80, width - roomSettings.wallWidth * 2 - 24);
+  const barrierWidth = Math.min(roomWidth * 0.78, Math.max(76, roomWidth * 0.58));
+  const x = left + (roomWidth - barrierWidth) / 2;
+  const cleanWord = String(word || "STONE").trim().toUpperCase();
+  setCanvasFont(14, "bold");
+  let label = cleanWord;
+  while (context.measureText(label).width < barrierWidth - 18) label += " · " + cleanWord;
+  state.obstacles.push({ word: cleanWord, label, x, y, width: barrierWidth, height: 26, previousY: y });
+}
+
+function spawnEditorItem(kind, item, index, total, width, height) {
+  const roomLeft = roomSettings.wallWidth + 18;
+  const roomWidth = Math.max(80, width - roomSettings.wallWidth * 2 - 36);
+  const columns = Math.max(1, Math.min(8, total));
+  const column = index % columns;
+  const row = Math.floor(index / columns);
+  const x = roomLeft + roomWidth * ((column + 1) / (columns + 1));
+  const y = Math.max(36, Math.min(height - getDeathWallHeight() - 30, height * 0.14 + row * 34));
+
+  if (kind === "enemies") return spawnEnemyData(item, x, y);
+  if (kind === "pickups") {
+    state.pickups.push({ data: item, x, y });
+    return true;
+  }
+  if (kind === "weapons") {
+    state.pickups.push({
+      data: { id: "test-weapon-" + item.id, name: "TEST DROP · " + item.name, glyph: item.projectileGlyph || "!", effect: "grantWeapon", amount: item.id, durationSeconds: 0 },
+      x, y
+    });
+    return true;
+  }
+  if (kind === "obstacles" || kind === "words") {
+    spawnTestObstacle(item.name || item.word || item.id, width, y, index);
+    return true;
+  }
+  if (kind === "patterns") {
+    const entries = Array.isArray(item.entries) ? item.entries : [];
+    entries.forEach((entry, entryIndex) => {
+      const count = Math.max(1, Math.min(26, Number(entry.count) || 1));
+      for (let n = 0; n < count; n += 1) {
+        const targetX = roomLeft + roomWidth * ((n + 1) / (count + 1));
+        const targetY = y + (entryIndex * count + n) * Math.max(24, Number(entry.spacing) || 30);
+        if (entry.type === "enemy" && enemyList.length) {
+          const enemy = enemyList.find(candidate => candidate.id === entry.id) || enemyList[(entryIndex + n) % enemyList.length];
+          spawnEnemyData(enemy, targetX, targetY);
+        } else if (entry.type === "pickup" && pickupList.length) {
+          const pickup = pickupList.find(candidate => candidate.id === entry.id) || pickupList[(entryIndex + n) % pickupList.length];
+          state.pickups.push({ data: pickup, x: targetX, y: targetY });
+        } else {
+          spawnTestObstacle(entry.id || entry.type || "STONE", width, targetY, n);
+        }
+      }
+    });
+    return entries.length > 0;
+  }
+  return false;
+}
+
+function spawnEditorSelection(all = false) {
+  let data;
+  try { data = JSON.parse(editorText.value); } catch { setEditorStatus("Fix the JSON before spawning from this category."); return; }
+  const collection = spawnToolCollection(editorPath, data);
+  if (!collection) return;
+  if (collection.kind === "feed") {
+    const width = canvas.getBoundingClientRect().width, height = canvas.getBoundingClientRect().height;
+    let count = 0;
+    const groups = [
+      ["enemies", enemyList],
+      ["pickups", pickupList],
+      ["weapons", weaponList],
+      ["words", horizontalWallWords.slice(0, 10).map((name, id) => ({ id: String(id), name }))]
+    ];
+    groups.forEach(([kind, items]) => items.forEach((item, index) => {
+      if (spawnEditorItem(kind, item, index, items.length, width, height)) count += 1;
+    }));
+    draw();
+    setEditorStatus("Spawned the full feed test set: " + count + " objects. Close F8 to watch them run.");
+    return;
+  }
+  let selectedItems = collection.items;
+  if (!all) {
+    const index = Math.max(0, Math.min(collection.items.length - 1, Number(spawnItemSelect.value) || 0));
+    selectedItems = [collection.items[index]];
+  } else if (collection.kind === "words") {
+    selectedItems = collection.items.slice(0, 10);
+  } else if (collection.kind === "patterns") {
+    selectedItems = collection.items;
+  }
+  const width = canvas.getBoundingClientRect().width, height = canvas.getBoundingClientRect().height;
+  let spawned = 0;
+  selectedItems.forEach((item, index) => {
+    if (collection.kind === "patterns") {
+      if (spawnEditorItem("patterns", item, index, selectedItems.length, width, height)) spawned += 1;
+    } else if (spawnEditorItem(collection.kind, item, index, selectedItems.length, width, height)) {
+      spawned += 1;
+    }
+  });
+  draw();
+  setEditorStatus("Spawned " + spawned + (all ? " entries" : " · " + (selectedItems[0]?.name || "selected item")) + " onto the game canvas.");
 }
 
 function renderEnemyTuner() {
