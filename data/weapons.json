@@ -24,7 +24,7 @@
       "spreadDegrees": 8,
       "projectilesPerShot": 2,
       "pattern": "spread",
-      "unlockedByDefault": false
+      "unlockedByDefault": true
     },
     {
       "id": "semicolon",
@@ -37,7 +37,7 @@
       "spreadDegrees": 5,
       "projectilesPerShot": 1,
       "pattern": "single",
-      "unlockedByDefault": false
+      "unlockedByDefault": true
     },
     {
       "id": "shotgun",
@@ -50,7 +50,7 @@
       "spreadDegrees": 48,
       "projectilesPerShot": 5,
       "pattern": "spread",
-      "unlockedByDefault": false
+      "unlockedByDefault": true
     },
     {
       "id": "bracket",
@@ -63,7 +63,7 @@
       "spreadDegrees": 24,
       "projectilesPerShot": 3,
       "pattern": "spread",
-      "unlockedByDefault": false
+      "unlockedByDefault": true
     },
     {
       "id": "laser",
@@ -77,7 +77,7 @@
       "pattern": "beam",
       "beamLength": 440,
       "beamDuration": 0.12,
-      "unlockedByDefault": false
+      "unlockedByDefault": true
     }
   ]
 }
