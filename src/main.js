@@ -1341,6 +1341,7 @@ function spawnEditorSelection(all = false) {
       ["enemies", enemyList],
       ["pickups", pickupList],
       ["weapons", weaponList],
+      ["obstacles", ["STONE", "BLOCK", "LOCK", "GATE"].map((name, id) => ({ id: String(id), name }))],
       ["words", horizontalWallWords.slice(0, 10).map((name, id) => ({ id: String(id), name }))]
     ];
     groups.forEach(([kind, items]) => items.forEach((item, index) => {
