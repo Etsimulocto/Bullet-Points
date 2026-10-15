@@ -1135,6 +1135,35 @@ function update(time) {
         nextPlayerY = Math.max(minY, Math.min(maxY, previousPlayerY + scrollCarry));
       }
     }
+
+    // A moving wall can sweep over the player even when the normal slide
+    // response has no open axis. If that leaves the player embedded, kick
+    // them to the nearest clear point beside or beyond the barrier.
+    if (!protectedByWordWall) {
+      const trappedBy = state.obstacles.find(obstacle =>
+        obstacleContainsPoint(nextPlayerX * width, nextPlayerY * height, obstacle)
+      );
+      if (trappedBy) {
+        const kickout = findWallKickoutPosition(
+          nextPlayerX * width,
+          nextPlayerY * height,
+          trappedBy,
+          width,
+          height,
+          wallMargin,
+          1 - wallMargin,
+          minY,
+          maxY
+        );
+        if (kickout) {
+          nextPlayerX = kickout.x;
+          nextPlayerY = kickout.y;
+          state.pickupMessage = "WALL KICKOUT · BACK IN THE RUN";
+          state.pickupMessageTime = 1.8;
+        }
+      }
+    }
+
     state.player.x = nextPlayerX;
     state.player.y = nextPlayerY;
     updateEnemySystem(dt, width, height, scrollDelta);
@@ -1266,6 +1295,32 @@ function obstacleContainsPoint(x, y, obstacle, obstacleY = obstacle.y) {
 
 function collidesWithObstacle(x, y) {
   return state.obstacles.find(obstacle => obstacleContainsPoint(x, y, obstacle));
+}
+
+function findWallKickoutPosition(x, y, obstacle, width, height, minX, maxX, minY, maxY) {
+  const radius = 13;
+  const sideStep = radius + 2;
+  const verticalStep = obstacle.height / 2 + radius + 2;
+  const xOptions = [x, obstacle.x - sideStep, obstacle.x + obstacle.width + sideStep];
+  const yOptions = [
+    y,
+    obstacle.y - verticalStep,
+    obstacle.y + verticalStep,
+    y - 16, y + 16, y - 32, y + 32,
+    y - 48, y + 48, y - 64, y + 64,
+  ];
+  const candidates = [];
+  for (const candidateX of xOptions) {
+    for (const candidateY of yOptions) {
+      if (candidateX < minX * width || candidateX > maxX * width ||
+          candidateY < minY * height || candidateY > maxY * height) continue;
+      if (state.obstacles.some(other => obstacleContainsPoint(candidateX, candidateY, other))) continue;
+      candidates.push({ x: candidateX / width, y: candidateY / height,
+        distance: Math.hypot(candidateX - x, candidateY - y) });
+    }
+  }
+  candidates.sort((a, b) => a.distance - b.distance);
+  return candidates[0] || null;
 }
 
 function segmentHitsObstacle(fromX, fromY, toX, toY, obstacle) {
