@@ -6,7 +6,7 @@ The playfield scrolls upward through a dungeon made from words. The player runs,
 
 ## Project status
 
-This lightweight browser-game scaffold is set up for building on the Raspberry Pi. It has no build system or external dependencies. The room-scroll scaffold moves distinct letter and symbol sidewalls downward while a fixed, two-line Wall of Death marks the bottom edge. Room speed, wall glyphs, wall width, and the death wall’s height and text load from `data/settings.json`. If it catches the player, press **R** or use **Restart Run** in the pause menu.
+This lightweight browser-game scaffold is set up for building on the Raspberry Pi. It has no build system or external dependencies. The room-scroll scaffold moves distinct letter and symbol sidewalls downward while a fixed, two-line Wall of Death marks the bottom edge. The title, buttons, control directions, health meter, three lives, score, and weapon readout sit inside the room frame. Wall contact costs one life; losing all three ends the run. Room speed, wall glyphs, wall width, and the death wall’s height and text load from `data/settings.json`. If the run ends, press **R** or use **Restart Run** in the pause menu.
 
 ## Run locally
 
@@ -45,7 +45,7 @@ Press **F8** or click **EDITOR [F8]** to open the side editor. Choose a JSON fil
 
 ## Pause menu and save slots
 
-Open **Pause / Settings** to pause movement, resume, restart the current scaffold run, invert the ink, and choose a control scheme. Three save slots store the current scaffold state in this browser's local storage. They are local to this browser/device and are not cloud saves.
+Open **Pause / Settings** to pause movement, resume, restart the current scaffold run, invert the ink, and choose a control scheme. Three save slots store the current scaffold state, including health, lives, and score, in this browser's local storage. They are local to this browser/device and are not cloud saves.
 
 The current scaffold save includes player position, room scroll position, wall position, and settings. The save format can grow when real dungeon progress and inventory are implemented. Sound remains a placeholder. The current weapon roster and pickups are active: collect floating pickups, and cycle through weapons with Q/E or gamepad LB/RB. Shots rotate toward their travel direction; the laser draws a short beam. Enemies and projectile damage are not connected yet. Menu wording is editable in `data/menu.json`.
 
