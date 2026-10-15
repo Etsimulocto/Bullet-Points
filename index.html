@@ -151,6 +151,16 @@
       </div>
       <p class="enemy-tuner-help">Changes apply live. Use SAVE DRAFT or DOWNLOAD FILE to keep the roster.</p>
     </section>
+    <section id="spawn-tools" class="spawn-tools" aria-labelledby="spawn-tools-title" hidden>
+      <h3 id="spawn-tools-title">LIVE SPAWNER</h3>
+      <label for="spawn-item-select">CHOOSE WHAT TO SPAWN</label>
+      <select id="spawn-item-select" aria-label="Choose a live game object to spawn"></select>
+      <div class="spawn-tools-actions">
+        <button id="spawn-selected" type="button">SPAWN SELECTED</button>
+        <button id="spawn-all" type="button">SPAWN ALL</button>
+      </div>
+      <p id="spawn-tools-help">Spawns test objects onto the paused game canvas. Close F8 to resume.</p>
+    </section>
     <textarea id="editor-text" spellcheck="false" aria-label="Selected JSON data file"></textarea>
     <div class="editor-actions">
       <button id="editor-validate" type="button">CHECK JSON</button>
