@@ -37,7 +37,7 @@ Open `http://localhost:8080` in a browser. To test from a phone on the same Wi-F
 
 ## Editing
 
-For normal content changes, edit the matching JSON file under `data/`. For example, change words in `data/word-sets/default.json`, weapon tuning in `data/weapons.json`, or menu text in `data/menu.json`. Keep JSON syntax valid. The built-in rough editor opens with F8 and edits one JSON data file at a time. It saves drafts in the current browser or downloads a JSON file; only menu labels and the existing scaffold settings are currently consumed by the game.
+For normal content changes, edit the matching JSON file under `data/`. For example, change words in `data/word-sets/default.json`, weapon tuning in `data/weapons.json`, or menu text in `data/menu.json`. Keep JSON syntax valid. The built-in rough editor opens with F8 and edits one JSON data file at a time. It saves drafts in the current browser or downloads a JSON file; controls, weapons, pickups, menu labels, and room settings are currently read by the game.
 
 ## Feed editor
 
@@ -47,12 +47,12 @@ Press **F8** or click **EDITOR [F8]** to open the side editor. Choose a JSON fil
 
 Open **Pause / Settings** to pause movement, resume, restart the current scaffold run, invert the ink, and choose a control scheme. Three save slots store the current scaffold state in this browser's local storage. They are local to this browser/device and are not cloud saves.
 
-The current scaffold save includes player position, room scroll position, wall position, and settings. The save format can grow when real dungeon progress and inventory are implemented. Sound remains a placeholder. Keyboard, gamepad, mouse, and dual-stick controls are wired into movement and visible test shots. The test shots are a controls check; enemy combat is not connected yet. Menu wording is editable in `data/menu.json`.
+The current scaffold save includes player position, room scroll position, wall position, and settings. The save format can grow when real dungeon progress and inventory are implemented. Sound remains a placeholder. The current weapon roster and pickups are active: collect floating pickups, and cycle through weapons with Q/E or gamepad LB/RB. Shots rotate toward their travel direction; the laser draws a short beam. Enemies and projectile damage are not connected yet. Menu wording is editable in `data/menu.json`.
 
 ## Controls
 
-- Keyboard: WASD or arrows to move; IJKL or mouse to aim; Space or mouse click to fire
-- Gamepad: left stick or D-pad to move; right stick to aim; A or RT to fire
+- Keyboard: WASD or arrows to move; IJKL or mouse to aim; Space or mouse click to fire; Q/E to cycle weapons
+- Gamepad: left stick or D-pad to move; right stick to aim; A or RT to fire; LB/RB to cycle weapons
 - Mobile: dual on-screen joysticks, left for movement and right for aiming/firing
 - Display: responsive vertical playfield with invertible paper/ink colors
 
