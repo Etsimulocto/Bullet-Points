@@ -7,7 +7,7 @@
   },
   "world": {
     "scrollSpeed": 42,
-    "spawnInterval": 1.4
+    "spawnInterval": 4.2
   },
   "player": {
     "startingHealth": 3,
