@@ -1,0 +1,40 @@
+{
+  "pickups": [
+    {
+      "id": "health",
+      "name": "HEAL",
+      "description": "Restore one health point.",
+      "glyph": "+",
+      "effect": "restoreHealth",
+      "amount": 1,
+      "durationSeconds": 0
+    },
+    {
+      "id": "shield",
+      "name": "SHIELD",
+      "description": "Block one hit.",
+      "glyph": "O",
+      "effect": "addShield",
+      "amount": 1,
+      "durationSeconds": 0
+    },
+    {
+      "id": "rapid-fire",
+      "name": "HASTE",
+      "description": "Fire faster for a short time.",
+      "glyph": "!",
+      "effect": "modifyFireRate",
+      "amount": 1.75,
+      "durationSeconds": 8
+    },
+    {
+      "id": "weapon",
+      "name": "ARM",
+      "description": "Unlock or switch to a weapon.",
+      "glyph": "↑",
+      "effect": "grantWeapon",
+      "amount": "burst",
+      "durationSeconds": 0
+    }
+  ]
+}
