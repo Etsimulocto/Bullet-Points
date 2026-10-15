@@ -1,0 +1,37 @@
+{
+  "weapons": [
+    {
+      "id": "single",
+      "name": "Single Shot",
+      "description": "A steady forward shot.",
+      "projectileGlyph": "•",
+      "damage": 1,
+      "shotsPerSecond": 4,
+      "spreadDegrees": 0,
+      "projectilesPerShot": 1,
+      "unlockedByDefault": true
+    },
+    {
+      "id": "burst",
+      "name": "Burst",
+      "description": "A short volley of quick shots.",
+      "projectileGlyph": "▪",
+      "damage": 1,
+      "shotsPerSecond": 8,
+      "spreadDegrees": 4,
+      "projectilesPerShot": 1,
+      "unlockedByDefault": false
+    },
+    {
+      "id": "spread",
+      "name": "Word Splitter",
+      "description": "Fires a fan of punctuation.",
+      "projectileGlyph": "*",
+      "damage": 1,
+      "shotsPerSecond": 2,
+      "spreadDegrees": 32,
+      "projectilesPerShot": 3,
+      "unlockedByDefault": false
+    }
+  ]
+}
