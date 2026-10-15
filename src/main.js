@@ -27,6 +27,9 @@ const touchSticks = document.querySelector("#touch-sticks"), app = document.quer
 const stage = document.querySelector(".stage");
 const deathWallLine1 = document.querySelector("#death-wall-line-1");
 const deathWallLine2 = document.querySelector("#death-wall-line-2");
+const deathWall = document.querySelector("#death-wall");
+const depthReadout = document.querySelector("#depth-readout");
+const pickupMessageReadout = document.querySelector("#pickup-message");
 const healthMeter = document.querySelector("#health-meter");
 const healthText = document.querySelector("#health-text");
 const livesReadout = document.querySelector("#lives-readout");
@@ -49,7 +52,7 @@ const roomSettings = {
   spawnInterval: 4.2,
   wallWidth: 54,
   glyphSpacing: 26,
-  deathWallHeight: 44,
+  deathWallHeight: 160,
   deathWallLines: ["WALL OF DEATH", "NO ESCAPE"],
   leftWallGlyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
   rightWallGlyphs: "0123456789!?<>+-*/"
@@ -349,8 +352,18 @@ function drawScrollingSidewall(x, wallWidth, glyphs, color, side) {
   context.globalAlpha = 1;
 }
 
+function getDeathWallHeight() {
+  return deathWall.getBoundingClientRect().height || roomSettings.deathWallHeight;
+}
+
+function getPlayerStartY() {
+  const height = Math.max(1, canvas.getBoundingClientRect().height);
+  return Math.max(0.18, Math.min(0.72, (height - getDeathWallHeight() - 28) / height));
+}
+
 function applyDeathWallSettings() {
   stage.style.setProperty("--death-wall-height", roomSettings.deathWallHeight + "px");
+  stage.style.setProperty("--death-wall-reserved-height", getDeathWallHeight() + "px");
   deathWallLine1.textContent = roomSettings.deathWallLines[0] || "WALL OF DEATH";
   deathWallLine2.textContent = roomSettings.deathWallLines[1] || "NO ESCAPE";
 }
@@ -361,6 +374,8 @@ function renderHud() {
   healthText.textContent = `${Math.max(0, Math.ceil(state.health))}/${Math.max(1, state.maxHealth)}`;
   livesReadout.textContent = `LIVES ${"●".repeat(Math.max(0, state.lives))}${"○".repeat(Math.max(0, state.maxLives - state.lives))}`;
   scoreReadout.textContent = `PTS ${Math.floor(state.score).toLocaleString()}`;
+  depthReadout.textContent = `DEPTH ${Math.floor(state.world.distance / 10)} m`;
+  pickupMessageReadout.textContent = state.gameOver ? "ERASED · PRESS R TO RESTART" : state.pickupMessageTime > 0 ? state.pickupMessage : "";
   const weapon = getWeapon();
   weaponReadout.textContent = `${weapon.projectileGlyph || "."} ${weapon.name.toUpperCase()}`;
 }
@@ -373,7 +388,7 @@ function loseLife() {
     state.keys.clear();
     return;
   }
-  state.player = { x: 0.5, y: 0.72 };
+  state.player = { x: 0.5, y: getPlayerStartY() };
   state.health = state.maxHealth;
   state.projectiles = [];
   state.pickupMessage = `LIFE LOST · ${state.lives} LEFT`;
@@ -391,25 +406,6 @@ function draw() {
   const wallWidth = Math.min(roomSettings.wallWidth, Math.max(34, width * 0.16));
   drawScrollingSidewall(0, wallWidth, roomSettings.leftWallGlyphs, color, "left");
   drawScrollingSidewall(width - wallWidth, wallWidth, roomSettings.rightWallGlyphs, color, "right");
-
-  context.fillStyle = color.ink;
-  context.textAlign = "center";
-  context.font = "14px 'Courier New', monospace";
-  context.fillText("THE DUNGEON IS A SENTENCE", width / 2, height * 0.26);
-  context.fillStyle = color.accent;
-  context.font = "bold 11px 'Courier New', monospace";
-  context.fillText("DEPTH " + Math.floor(state.world.distance / 10) + " m", width / 2, height * 0.31);
-  context.fillText(state.paused ? "PAUSED · TAKE YOUR TIME" : "MOVE · AIM · SURVIVE", width / 2, height * 0.37);
-
-  context.textAlign = "left";
-  context.font = "bold 12px 'Courier New', monospace";
-  context.fillText("HP " + state.health + "/" + state.maxHealth + "   SHIELD " + state.shields, wallWidth + 12, 20);
-  context.textAlign = "right";
-  context.fillText(getWeapon().projectileGlyph + " " + getWeapon().name + "  [Q / E]", width - wallWidth - 12, 20);
-  if (state.pickupMessageTime > 0) {
-    context.textAlign = "center";
-    context.fillText(state.pickupMessage, width / 2, height * 0.43);
-  }
 
   state.obstacles.forEach(obstacle => {
     context.save();
@@ -496,26 +492,13 @@ function draw() {
     context.restore();
   });
 
-  if (state.gameOver) {
-    context.fillStyle = state.inverted ? "rgb(0 0 0 / 72%)" : "rgb(244 240 230 / 82%)";
-    context.fillRect(wallWidth, height * 0.38, width - wallWidth * 2, height * 0.22);
-    context.fillStyle = color.accent;
-    context.font = "bold 22px 'Courier New', monospace";
-    context.textAlign = "center";
-    context.textBaseline = "alphabetic";
-    context.fillText("ERASED", width / 2, height * 0.47);
-    context.fillStyle = color.ink;
-    context.font = "12px 'Courier New', monospace";
-    context.fillText(`SCORE ${Math.floor(state.score).toLocaleString()} · NO LIVES LEFT`, width / 2, height * 0.51);
-    context.fillText("PRESS R TO RESTART", width / 2, height * 0.55);
-  }
 }
 
 function update(time) {
   const dt = Math.min((time - state.lastTime) / 1000 || 0, 0.04);
   state.lastTime = time;
   const { width, height } = canvas.getBoundingClientRect();
-  state.world.deathWallY = height - roomSettings.deathWallHeight;
+  state.world.deathWallY = height - getDeathWallHeight();
 
   if (!state.paused && !state.gameOver) {
     state.runTime += dt;
@@ -561,7 +544,7 @@ function update(time) {
     });
     const wallMargin = Math.min(0.18, roomSettings.wallWidth / Math.max(width, 1) + 0.025);
     const minX = wallMargin, maxX = 1 - wallMargin;
-    const minY = 0.08, maxY = 0.98;
+    const minY = 0.08, maxY = Math.min(0.98, (state.world.deathWallY - 16) / height);
     nextPlayerX = Math.max(minX, Math.min(maxX, nextPlayerX));
     nextPlayerY = Math.max(minY, Math.min(maxY, nextPlayerY));
     const nextPx = nextPlayerX * width, nextPy = nextPlayerY * height;
@@ -594,8 +577,8 @@ function update(time) {
 
 function resetRun() {
   const { height } = canvas.getBoundingClientRect();
-  state.player = { x: 0.5, y: 0.76 };
-  state.world = { scrollOffset: 0, deathWallY: height - roomSettings.deathWallHeight, distance: 0 };
+  state.player = { x: 0.5, y: getPlayerStartY() };
+  state.world = { scrollOffset: 0, deathWallY: height - getDeathWallHeight(), distance: 0 };
   state.gameOver = false;
   state.projectiles = [];
   state.beams = [];
@@ -889,12 +872,12 @@ function loadRun(slot) {
   }
   state.player = {
     x: Number.isFinite(snapshot.player.x) ? Math.max(0.04, Math.min(0.96, snapshot.player.x)) : 0.5,
-    y: Number.isFinite(snapshot.player.y) ? Math.max(0.08, Math.min(0.92, snapshot.player.y)) : 0.76,
+    y: Number.isFinite(snapshot.player.y) ? Math.max(0.08, Math.min(getPlayerStartY(), snapshot.player.y)) : getPlayerStartY(),
   };
   if (snapshot.world && Number.isFinite(snapshot.world.scrollOffset)) {
     state.world = {
       scrollOffset: snapshot.world.scrollOffset,
-      deathWallY: Number.isFinite(snapshot.world.deathWallY) ? snapshot.world.deathWallY : canvas.getBoundingClientRect().height - roomSettings.deathWallHeight,
+      deathWallY: Number.isFinite(snapshot.world.deathWallY) ? snapshot.world.deathWallY : canvas.getBoundingClientRect().height - getDeathWallHeight(),
       distance: Number.isFinite(snapshot.world.distance) ? snapshot.world.distance : 0,
     };
   } else {
@@ -1008,7 +991,7 @@ async function applyMenuCopy() {
 
 bindStick(leftStick,leftStickKnob,"move");
 bindStick(rightStick,rightStickKnob,"aim");
-window.addEventListener("resize",()=>{applyControlScheme();resizeCanvas();});
+window.addEventListener("resize",()=>{applyControlScheme();applyDeathWallSettings();resizeCanvas();});
 canvas.addEventListener("pointermove",e=>{
   if(e.pointerType==="touch"||["gamepad","touch"].includes(state.controlScheme))return;
   const b=canvas.getBoundingClientRect(),dx=e.clientX-b.left-b.width*state.player.x,dy=e.clientY-b.top-b.height*state.player.y,len=Math.hypot(dx,dy);
@@ -1103,6 +1086,7 @@ renderSaveSlots();
 applyMenuCopy();
 applyControlScheme();
 applyDeathWallSettings();
+state.player.y = getPlayerStartY();
 loadControlMap();
 loadCombatData();
 loadWorldSettings();
