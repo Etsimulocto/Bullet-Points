@@ -26,7 +26,7 @@
   "wallOfDeath": {
     "label": "WALL OF DEATH",
     "hitText": "ERASED",
-    "height": 160,
+    "height": 240,
     "lines": [
       "WALL OF DEATH",
       "NO ESCAPE"
