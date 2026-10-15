@@ -5,6 +5,7 @@ These JSON files are meant to be easy to edit with a text editor. Keep the JSON 
 ## Files
 
 - `settings.json` — paper/ink colors, scroll speeds, player defaults, display options, sidewall glyphs, and Wall of Death setup
+- `controls.json` — keyboard keys, gamepad axes/buttons, and touch dead zone
 - `weapons.json` — weapon names and starter tuning values
 - `pickups.json` — pickup names and effects
 - `enemies.json` — enemy stats and behavior identifiers
