@@ -70,7 +70,8 @@
     "noGamepad": "No controller detected. Connect a USB or Bluetooth gamepad.",
     "gamepadConnected": "Connected: {name}",
     "gamepadUnsupported": "Gamepad API unavailable in this browser.",
-    "gamepadSelected": "Gamepad selected."
+    "gamepadSelected": "Gamepad selected.",
+    "fontLabel": "Game font"
   },
   "messages": {
     "loading": "TURNING THE PAGE…",
