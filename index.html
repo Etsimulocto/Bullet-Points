@@ -23,11 +23,15 @@
     </header>
     <section class="stage" aria-label="Game viewport">
       <canvas id="game" aria-label="Bullet Points game canvas"></canvas>
-      <div class="stage-label">GAME SCAFFOLD · READY TO BUILD</div>
+      <div id="touch-sticks" class="touch-sticks" hidden aria-label="Touch controls">
+        <div id="left-stick" class="virtual-stick" role="application" aria-label="Move joystick"><span class="stick-caption">MOVE</span><span id="left-stick-knob" class="stick-knob"></span></div>
+        <div id="right-stick" class="virtual-stick" role="application" aria-label="Aim and fire joystick"><span class="stick-caption">AIM · FIRE</span><span id="right-stick-knob" class="stick-knob"></span></div>
+      </div>
+      <div class="stage-label">WASD / ARROWS · IJKL AIM · SPACE FIRE</div>
     </section>
     <footer>
-      <span>WASD / arrows to move</span>
-      <span>Dual mobile sticks planned</span>
+      <span>WASD / arrows move · IJKL aim · Space fires</span>
+      <span>Gamepad: left stick move · right stick aim · A / RT fires</span>
     </footer>
   </main>
 
