@@ -169,7 +169,11 @@ async function loadCombatData() {
       if (Array.isArray(data.pickups)) pickupList = data.pickups;
     }
     if (enemyResponse.ok) {
-      const data = await enemyResponse.json();
+      let data = await enemyResponse.json();
+      try {
+        const draft = localStorage.getItem(EDITOR_DRAFT_PREFIX + "../data/enemies.json");
+        if (draft) data = JSON.parse(draft);
+      } catch {}
       if (Array.isArray(data.enemies)) enemyList = data.enemies.filter(enemy => enemy && enemy.id && enemy.letter && enemy.name);
     }
   } catch {
