@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f0e6">
+  <title>Bullet Points</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">AN INFINITE WORD DUNGEON</p>
+        <h1>Bullet Points</h1>
+      </div>
+      <button id="invert-button" type="button" aria-pressed="false">Invert ink</button>
+    </header>
+    <section class="stage" aria-label="Game viewport">
+      <canvas id="game" aria-label="Bullet Points game canvas"></canvas>
+      <div class="stage-label">GAME SCAFFOLD · READY TO BUILD</div>
+    </section>
+    <footer>
+      <span>WASD / arrows to move</span>
+      <span>Dual mobile sticks planned</span>
+    </footer>
+  </main>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
