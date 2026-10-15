@@ -150,10 +150,11 @@ let pickupList = [];
 let enemyList = [];
 let horizontalWallWords = ["STONE", "BARRIER", "PARAGRAPH", "BLOCK"];
 let numberHazardList = [];
+let obstacleSetList = [];
 const catalogData = { enemies: [], weapons: [], pickups: [], obstacles: [], patterns: [], wordSet: {}, settings: {}, controls: {}, menu: {}, feed: {} };
 const state = {
   inverted: false, paused: false, soundEnabled: true, controlScheme: "auto", fontTheme: "dos", keys: new Set(),
-  player: { x: 0.5, y: 0.76 }, projectiles: [], beams: [], pickups: [], obstacles: [], numberHazards: [], effects: [],
+  player: { x: 0.5, y: 0.76 }, projectiles: [], beams: [], pickups: [], obstacles: [], fallingBlocks: [], numberHazards: [], effects: [],
   fireCooldown: 0, aim: { x: 0, y: -1 }, gameOver: false,
   enemies: [], enemyBullets: [], explosions: [], enemySpawnIndex: 0,
   health: 3, maxHealth: 3, lives: 3, maxLives: 3, score: 0, shields: 0, weaponId: "period", unlockedWeapons: ["period"],
@@ -235,6 +236,7 @@ async function loadCatalogData() {
     catalogData[key] = listKey ? (Array.isArray(data[listKey]) ? data[listKey] : []) : data;
   });
   numberHazardList = catalogData.obstacles.filter(item => item?.type === "number");
+  obstacleSetList = catalogData.obstacles.filter(item => item?.type === "set");
   renderCatalog();
 }
 
@@ -244,6 +246,7 @@ async function loadStartupContent() {
   catalogData.weapons = weaponList;
   catalogData.pickups = pickupList;
   numberHazardList = (catalogData.obstacles || []).filter(item => item?.type === "number");
+  obstacleSetList = (catalogData.obstacles || []).filter(item => item?.type === "set");
   renderCatalog();
 }
 
@@ -298,7 +301,11 @@ function renderCatalog() {
     `${pickup.glyph || "?"} · ${pickup.effect || "?"} × ${pickup.amount ?? 1} · ${pickup.durationSeconds || 0}s · WEIGHT ${pickup.weight ?? "?"} · ${pickup.description || ""}`);
   addCatalogSection("OBSTACLES & EQUATIONS", obstacles, obstacle => obstacle.type === "number"
     ? `${obstacle.equation || obstacle.name} · ${obstacle.behavior} · RANGE ${obstacle.triggerRadius}px · SUCTION ${obstacle.suctionSpeed ?? 0} · HOLD ${obstacle.holdSeconds ?? 0}s · SLAM ${obstacle.slamSpeed ?? 0} · LAUNCH ${obstacle.launchSpeed ?? 0}`
-    : `${obstacle.wordSet || "wall"} · ${obstacle.collision || "solid"} · HP ${obstacle.health ?? 0} · BREAKS INTO LETTERS ${obstacle.breaksIntoLetters ? "YES" : "NO"}`);
+    : obstacle.type === "set"
+      ? `${obstacle.formation} · ${obstacle.rows} ROWS · SPACING ${obstacle.rowSpacing}px · GAP ${Math.round((obstacle.gapFraction || 0.28) * 100)}% · ${obstacle.description || ""}`
+      : obstacle.type === "block"
+        ? `FALL SPEED ${obstacle.fallSpeed}px/s · GRAVITY ${obstacle.gravity}px/s² · SLIDE ${obstacle.slideSpeed}px/s`
+        : `${obstacle.wordSet || "wall"} · ${obstacle.collision || "solid"} · HP ${obstacle.health ?? 0} · BREAKS INTO LETTERS ${obstacle.breaksIntoLetters ? "YES" : "NO"}`);
   addCatalogSection("SPAWN PATTERNS", patterns, pattern =>
     `${pattern.description || ""} · ${(pattern.entries || []).map(entry => `${entry.count || 1}× ${entry.type}:${entry.id} (gap ${entry.spacing || 0})`).join(" · ")}`);
 
@@ -336,6 +343,7 @@ function refreshCatalogFromEditor() {
   else if (editorPath.endsWith("/obstacles.json")) {
     catalogData.obstacles = data.obstacles || [];
     numberHazardList = catalogData.obstacles.filter(item => item?.type === "number");
+    obstacleSetList = catalogData.obstacles.filter(item => item?.type === "set");
   }
   else if (editorPath.endsWith("/spawn-patterns.json")) catalogData.patterns = data.patterns || [];
   else if (editorPath.includes("/word-sets/")) catalogData.wordSet = data;
@@ -908,16 +916,33 @@ function draw() {
     context.beginPath();
     context.rect(obstacle.x, obstacle.y - obstacle.height / 2, obstacle.width, obstacle.height);
     context.clip();
+    const obstacleColor = obstacle.kind === "gate" ? "#278da5" : obstacle.kind === "lock" ? "#e49b32" : color.accent;
     context.fillStyle = color.paper;
     context.fillRect(obstacle.x, obstacle.y - obstacle.height / 2, obstacle.width, obstacle.height);
-    context.strokeStyle = color.accent;
-    context.lineWidth = 2;
+    context.strokeStyle = obstacleColor;
+    context.lineWidth = obstacle.kind === "gate" ? 3 : 2;
     context.strokeRect(obstacle.x, obstacle.y - obstacle.height / 2, obstacle.width, obstacle.height);
     context.fillStyle = color.ink;
     context.textAlign = "center";
     context.textBaseline = "middle";
     setCanvasFont(14, "bold");
     context.fillText(obstacle.label, obstacle.x + obstacle.width / 2, obstacle.y);
+    context.restore();
+  });
+
+  state.fallingBlocks.forEach(block => {
+    context.save();
+    context.fillStyle = color.paper;
+    context.strokeStyle = "#d97706";
+    context.lineWidth = 3;
+    context.fillRect(block.x - block.size / 2, block.y - block.size / 2, block.size, block.size);
+    context.strokeRect(block.x - block.size / 2, block.y - block.size / 2, block.size, block.size);
+    context.fillStyle = color.ink;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    setCanvasFont(Math.max(9, Math.min(14, block.size * 0.32)), "bold");
+    context.fillText("BLOCK", block.x, block.y, block.size - 4);
+    if (block.sliding) { context.fillStyle = "#d97706"; setCanvasFont(9, "bold"); context.fillText("↔", block.x, block.y + block.size / 2 + 8); }
     context.restore();
   });
 
@@ -1141,6 +1166,7 @@ function update(time) {
       obstacle.y += dt * scrollStep;
       return obstacle.y < state.world.deathWallY - 12;
     });
+    updateFallingBlocks(dt, width, scrollStep);
     const wallMargin = Math.min(0.18, roomSettings.wallWidth / Math.max(width, 1) + 0.025);
     const minX = wallMargin, maxX = 1 - wallMargin;
     const minY = 0.08, maxY = Math.min(0.98, (state.world.deathWallY - 16) / height);
@@ -1154,16 +1180,16 @@ function update(time) {
     const oldPx = previousPlayerX * width, oldPy = previousPlayerY * height;
     const protectedByWordWall = state.effects.some(effect => effect.effect === "wordWall");
     const endCollision = protectedByWordWall ? null : collidesWithObstacle(nextPx, nextPy);
-    const sweptCollision = protectedByWordWall ? null : state.obstacles.find(obstacle =>
+    const sweptCollision = protectedByWordWall ? null : solidObstacles().find(obstacle =>
       segmentHitsObstacle(oldPx, oldPy, nextPx, nextPy, obstacle)
     );
 
     if (endCollision || sweptCollision) {
-      const hitsHorizontalPath = state.obstacles.some(obstacle =>
+      const hitsHorizontalPath = solidObstacles().some(obstacle =>
         collidesWithObstacle(nextPx, oldPy) === obstacle ||
         segmentHitsObstacle(oldPx, oldPy, nextPx, oldPy, obstacle)
       );
-      const hitsVerticalPath = state.obstacles.some(obstacle =>
+      const hitsVerticalPath = solidObstacles().some(obstacle =>
         collidesWithObstacle(oldPx, nextPy) === obstacle ||
         segmentHitsObstacle(oldPx, oldPy, oldPx, nextPy, obstacle)
       );
@@ -1183,7 +1209,7 @@ function update(time) {
     // response has no open axis. If that leaves the player embedded, kick
     // them to the nearest clear point beside or beyond the barrier.
     if (!protectedByWordWall) {
-      const trappedBy = state.obstacles.find(obstacle =>
+      const trappedBy = solidObstacles().find(obstacle =>
         obstacleContainsPoint(nextPlayerX * width, nextPlayerY * height, obstacle)
       );
       if (trappedBy) {
@@ -1239,6 +1265,7 @@ function resetRun() {
   state.enemySpawnIndex = 0;
   state.pickups = [];
   state.obstacles = [];
+  state.fallingBlocks = [];
   state.numberHazards = [];
   state.effects = [];
   state.health = 3;
@@ -1299,11 +1326,62 @@ function spawnEnemy(width) {
   spawnEnemyData(data, left + Math.random() * (right - left), -24);
 }
 
+function spawnStoneRow(width,y,gapSide,gapFraction=.28,word="STONE",setId=""){
+  const left=roomSettings.wallWidth+12, roomWidth=Math.max(100,width-roomSettings.wallWidth*2-24);
+  const gapWidth=Math.max(72,Math.min(roomWidth*.38,roomWidth*gapFraction)), wallWidth=roomWidth-gapWidth;
+  const kind=word==="GATE"?"gate":word==="LOCK"?"lock":"stone";
+  const parts=gapSide==="center"?[{x:left,width:wallWidth/2},{x:left+wallWidth/2+gapWidth,width:wallWidth/2}]:[{x:gapSide==="left"?left+gapWidth:left,width:wallWidth}];
+  return parts.filter(p=>p.width>=52).map(p=>{const o={id:(setId||"wall")+"-"+Math.random().toString(36).slice(2,7),kind,word,label:word,x:p.x,y,width:p.width,height:28,previousY:y,setId};state.obstacles.push(o);return o;});
+}
+function spawnLockToken(x,y,setId=""){
+  const width=44,height=36,o={id:(setId||"lock")+"-token-"+Math.random().toString(36).slice(2,7),kind:"lock",word:"LOCK",label:"LOCK",x:x-width/2,y,width,height,previousY:y,setId};
+  state.obstacles.push(o);return o;
+}
+function spawnFallingBlock(data,width,x,y,setId=""){
+  const size=Math.max(28,Math.min(54,Number(data?.size)||38)),left=roomSettings.wallWidth+12+size/2,right=Math.max(left+1,width-roomSettings.wallWidth-12-size/2);
+  const b={id:(data?.id||"falling-block")+"-"+Math.random().toString(36).slice(2,7),kind:"block",label:data?.name||"BLOCK",x:Math.max(left,Math.min(right,x)),y,previousX:x,previousY:y,width:size,height:size,size,fallSpeed:Math.max(40,Number(data?.fallSpeed)||95),gravity:Math.max(0,Number(data?.gravity)||50),slideSpeed:Math.max(60,Number(data?.slideSpeed)||190),slideDirection:Math.random()<.5?-1:1,vx:0,sliding:false,supportId:"",setId};
+  b.previousX=b.x;state.fallingBlocks.push(b);return b;
+}
+function updateFallingBlocks(dt,width,scrollStep){
+  const left=roomSettings.wallWidth+12,right=width-roomSettings.wallWidth-12;
+  state.fallingBlocks=state.fallingBlocks.filter(b=>{
+    b.previousX=b.x;b.previousY=b.y;const half=b.size/2,support=b.sliding?state.obstacles.find(w=>w.id===b.supportId):null;
+    if(support){
+      b.y=support.y-support.height/2-half;b.vx=b.slideDirection*b.slideSpeed;b.x+=b.vx*dt;
+      const cleared=b.x+half<support.x||b.x-half>support.x+support.width;
+      const atEdge=b.slideDirection<0?b.x-half<=left+1:b.x+half>=right-1;
+      if(cleared||atEdge){b.sliding=false;b.supportId="";b.vx=0;b.fallSpeed=Math.max(75,b.fallSpeed);b.y+=2;}
+    }else{
+      b.sliding=false;b.supportId="";b.y+=(scrollStep+b.fallSpeed)*dt;b.fallSpeed+=b.gravity*dt;b.x+=b.vx*dt;
+      if(b.x-half<=left){b.x=left+half;if(b.vx<0)b.vx=Math.abs(b.vx);}
+      if(b.x+half>=right){b.x=right-half;if(b.vx>0)b.vx=-Math.abs(b.vx);}
+      const landed=state.obstacles.find(w=>{
+        if(w.kind==="lock")return false;
+        const overlaps=b.x+half>w.x&&b.x-half<w.x+w.width, before=(Number.isFinite(w.previousY)?w.previousY:w.y)-w.height/2, now=w.y-w.height/2;
+        return overlaps&&b.y+half>=now&&b.previousY+half<=before+5&&b.y<w.y;
+      });
+      if(landed){b.y=landed.y-landed.height/2-half;b.fallSpeed=0;b.sliding=true;b.supportId=landed.id;b.slideDirection=b.x<landed.x+landed.width/2?1:-1;b.vx=b.slideDirection*b.slideSpeed;}
+    }
+    return b.y<(state.world.deathWallY||0)+60;
+  });
+}
+function spawnObstacleSet(width,setData,startY=-70){
+  const set=setData||obstacleSetList[Math.floor(Math.random()*obstacleSetList.length)];if(!set)return false;
+  const roomLeft=roomSettings.wallWidth+12,roomWidth=Math.max(100,width-roomSettings.wallWidth*2-24),rows=Math.max(2,Math.min(4,Number(set.rows)||3)),spacing=Math.max(150,Number(set.rowSpacing)||190),gap=Math.max(.22,Math.min(.38,Number(set.gapFraction)||.3)),setId=set.id||"obstacle-set",sides=set.gapSequence?.length?set.gapSequence:["left","right","center","left"];
+  for(let row=0;row<rows;row++){
+    const side=sides[row%sides.length],y=startY-row*spacing,word=set.formation==="lock-gate"?(row%2?"LOCK":"GATE"):"STONE",segments=spawnStoneRow(width,y,side,gap,word,setId);
+    if(set.formation==="block-skate"){const wall=segments.sort((a,b)=>b.width-a.width)[0];if(wall){const cfg=set.block||{size:38,fallSpeed:105,gravity:45,slideSpeed:210};spawnFallingBlock(cfg,width,wall.x+wall.width*(row%2?.66:.34),y-Math.max(70,Number(set.blockDropHeight)||90),setId);}}
+    if(set.formation==="lock-gate"&&row%2===1){const gx=side==="left"?roomLeft+roomWidth*gap/2:side==="right"?roomLeft+roomWidth*(1-gap/2):roomLeft+roomWidth/2;spawnLockToken(gx,y,setId);}
+  }
+  return true;
+}
+
 function spawnWorldDrop(width) {
   const roomWidth = Math.max(80, width - roomSettings.wallWidth * 2 - 24);
-  const enemyChance = enemyList.length ? 0.3 : 0;
-  const pickupChance = pickupList.length ? 0.35 : 0;
-  const numberHazardChance = numberHazardList.length ? 0.2 : 0;
+  const enemyChance = enemyList.length ? 0.27 : 0;
+  const pickupChance = pickupList.length ? 0.28 : 0;
+  const numberHazardChance = numberHazardList.length ? 0.18 : 0;
+  const obstacleSetChance = obstacleSetList.length ? 0.22 : 0;
   const roll = Math.random();
   if (roll < enemyChance) {
     spawnEnemy(width);
@@ -1322,6 +1400,10 @@ function spawnWorldDrop(width) {
     spawnNumberHazard(data, width, Math.max(80, width - roomSettings.wallWidth * 2), -42);
     return;
   }
+  if (roll < enemyChance + pickupChance + numberHazardChance + obstacleSetChance) {
+    spawnObstacleSet(width);
+    return;
+  }
 
   const left = roomSettings.wallWidth + 12;
   const maxWidth = Math.max(0, Math.min(roomWidth * 0.9, roomWidth - 28));
@@ -1333,7 +1415,7 @@ function spawnWorldDrop(width) {
   setCanvasFont(14, "bold");
   let label = word;
   while (context.measureText(label).width < barrierWidth - 18) label += " · " + word;
-  state.obstacles.push({ word, label, x, y: -28, width: barrierWidth, height: 26 });
+  state.obstacles.push({ kind: "stone", word, label, x, y: -28, width: barrierWidth, height: 26, previousY: -28 });
   state.nextWallSide = gapSide === "left" ? "right" : "left";
 }
 
@@ -1474,7 +1556,7 @@ function updateNumberHazards(dt, width, height, scrollDelta, playerX, playerY, m
       if (nextPy > maxY * height) { nextPy = maxY * height; hazard.velocityY = -Math.abs(hazard.velocityY); hazard.bounces += 1; }
       const struckWall = state.effects.some(effect => effect.effect === "wordWall")
         ? null
-        : state.obstacles.find(obstacle => obstacleContainsPoint(nextPx, nextPy, obstacle));
+        : solidObstacles().find(obstacle => obstacleContainsPoint(nextPx, nextPy, obstacle));
       if (struckWall) {
         const hitX = obstacleContainsPoint(nextPx, py, struckWall);
         const hitY = obstacleContainsPoint(px, nextPy, struckWall);
@@ -1506,14 +1588,18 @@ function updateNumberHazards(dt, width, height, scrollDelta, playerX, playerY, m
   return { x: targetX, y: targetY };
 }
 
-function obstacleContainsPoint(x, y, obstacle, obstacleY = obstacle.y) {
+function solidObstacles() {
+  return state.obstacles.concat(state.fallingBlocks);
+}
+
+function obstacleContainsPoint(x, y, obstacle, obstacleX = obstacle.x, obstacleY = obstacle.y) {
   const radius = 10;
-  return x + radius > obstacle.x && x - radius < obstacle.x + obstacle.width &&
+  return x + radius > obstacleX && x - radius < obstacleX + obstacle.width &&
     y + radius > obstacleY - obstacle.height / 2 && y - radius < obstacleY + obstacle.height / 2;
 }
 
 function collidesWithObstacle(x, y) {
-  return state.obstacles.find(obstacle => obstacleContainsPoint(x, y, obstacle));
+  return solidObstacles().find(obstacle => obstacleContainsPoint(x, y, obstacle));
 }
 
 function findWallKickoutPosition(x, y, obstacle, width, height, minX, maxX, minY, maxY) {
@@ -1533,7 +1619,7 @@ function findWallKickoutPosition(x, y, obstacle, width, height, minX, maxX, minY
     for (const candidateY of yOptions) {
       if (candidateX < minX * width || candidateX > maxX * width ||
           candidateY < minY * height || candidateY > maxY * height) continue;
-      if (state.obstacles.some(other => obstacleContainsPoint(candidateX, candidateY, other))) continue;
+      if (solidObstacles().some(other => obstacleContainsPoint(candidateX, candidateY, other))) continue;
       candidates.push({ x: candidateX / width, y: candidateY / height,
         distance: Math.hypot(candidateX - x, candidateY - y) });
     }
@@ -1554,8 +1640,11 @@ function segmentHitsObstacle(fromX, fromY, toX, toY, obstacle) {
   let enter = 0;
   let leave = 1;
 
+  const previousX = Number.isFinite(obstacle.previousX) ? obstacle.previousX : obstacle.x;
+  const fromRelativeX = fromX - previousX;
+  const toRelativeX = toX - obstacle.x;
   for (const [origin, delta, min, max] of [
-    [fromX, toX - fromX, left, right],
+    [fromRelativeX, toRelativeX - fromRelativeX, -radius, obstacle.width + radius],
     [fromRelativeY, toRelativeY - fromRelativeY, top, bottom]
   ]) {
     if (Math.abs(delta) < 0.0001) {
@@ -1711,15 +1800,8 @@ function renderSpawnTools() {
 }
 
 function spawnTestObstacle(word, width, y, index = 0) {
-  const left = roomSettings.wallWidth + 12;
-  const roomWidth = Math.max(80, width - roomSettings.wallWidth * 2 - 24);
-  const barrierWidth = Math.min(roomWidth * 0.78, Math.max(76, roomWidth * 0.58));
-  const x = left + (roomWidth - barrierWidth) / 2;
   const cleanWord = String(word || "STONE").trim().toUpperCase();
-  setCanvasFont(14, "bold");
-  let label = cleanWord;
-  while (context.measureText(label).width < barrierWidth - 18) label += " · " + cleanWord;
-  state.obstacles.push({ word: cleanWord, label, x, y, width: barrierWidth, height: 26, previousY: y });
+  spawnStoneRow(width, y, ["left", "right", "center"][index % 3], 0.3, cleanWord === "GATE" ? "GATE" : cleanWord === "LOCK" ? "LOCK" : "STONE");
 }
 
 function spawnEditorItem(kind, item, index, total, width, height) {
@@ -1744,6 +1826,11 @@ function spawnEditorItem(kind, item, index, total, width, height) {
     return true;
   }
   if (kind === "obstacles" && item.type === "number") return spawnNumberHazard(item, width, height, y, x);
+  if (kind === "obstacles" && item.type === "set") return spawnObstacleSet(width, item, y);
+  if (kind === "obstacles" && item.type === "block") return Boolean(spawnFallingBlock(item, width, x, y));
+  if (kind === "obstacles" && item.type === "gate") return spawnStoneRow(width, y, ["left", "right", "center"][index % 3], item.gapFraction || 0.3, "GATE").length > 0;
+  if (kind === "obstacles" && item.type === "lock") return Boolean(spawnLockToken(x, y));
+  if (kind === "obstacles" && item.type === "stone") return spawnStoneRow(width, y, ["left", "right", "center"][index % 3], item.gapFraction || 0.28, "STONE").length > 0;
   if (kind === "obstacles" || kind === "words") {
     spawnTestObstacle(item.name || item.word || item.id, width, y, index);
     return true;
@@ -2145,6 +2232,7 @@ function loadRun(slot) {
   state.weaponId = state.unlockedWeapons.includes(snapshot.weaponId) ? snapshot.weaponId : state.unlockedWeapons[0];
   state.pickups = [];
   state.obstacles = [];
+  state.fallingBlocks = [];
   state.numberHazards = [];
   state.worldSpawnTimer = 1.5;
   state.nextWallSide = "left";
