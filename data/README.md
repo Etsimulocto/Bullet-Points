@@ -10,7 +10,7 @@ These JSON files are meant to be easy to edit with a text editor. Keep the JSON 
 - `pickups.json` — pickup names and effects
 - `enemies.json` — enemy stats and behavior identifiers
 - `obstacles.json` — walls, doors, and collision behavior
-- `word-sets/default.json` — the words used by the starter feed
+- `word-sets/default.json` — background and entity words, including the editable `horizontalWalls` word bank
 - `spawn-patterns.json` — groups and arrangements of enemies or obstacles
 - `menu.json` — menu button labels and settings-menu wording, including slot actions
 - `feeds/default.json` — selects which files a feed uses
@@ -21,4 +21,4 @@ Weapons and pickups are loaded by the current game loop. Weapon entries define g
 The settings dialog reads its button and status wording from `menu.json`. Three browser-local save slots currently preserve the scaffold player's position and settings; expand the save snapshot when game progress is added.
 
 
-Press F8 to open the built-in JSON editor. It supports one data file at a time, JSON validation, browser-local drafts, downloads, and reset to the repository copy. Weapons and pickups currently connect to gameplay; enemy and obstacle behavior is still being built.
+Press F8 to open the built-in JSON editor. It supports one data file at a time, JSON validation, browser-local drafts, downloads, and reset to the repository copy. Weapons, pickups, and the random drop generator connect to gameplay. Horizontal wall words come from `word-sets/default.json`, alternate their open side, and cap at 90% of the interior room width so a route remains around each wall.
