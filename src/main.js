@@ -17,6 +17,45 @@ const palette = {
 };
 const SLOT_PREFIX = "bulletPoints.saveSlot.";
 const SLOT_COUNT = 3;
+const uiText = {
+  title: "PAUSED / SETTINGS",
+  pauseSettings: "Ⅱ PAUSE / SETTINGS",
+  resume: "RESUME RUN",
+  displayHeading: "DISPLAY & SOUND",
+  inkLabel: "Ink colors",
+  invertOn: "INVERT INK: ON",
+  invertOff: "INVERT INK: OFF",
+  soundLabel: "Sound effects",
+  soundNote: "(ready for audio)",
+  controlsHeading: "CONTROLS",
+  keyboard: "Keyboard and mouse",
+  touch: "Dual mobile sticks",
+  touchNote: "(input support is planned)",
+  saveSlots: "SAVE SLOTS",
+  storageNote: "Stored in this browser",
+  slotName: "SAVE SLOT {slot}",
+  empty: "EMPTY",
+  savedPrefix: "Saved ",
+  savedRun: "Saved run",
+  save: "SAVE",
+  load: "LOAD",
+  clear: "CLEAR",
+  restart: "RESTART RUN",
+  replacePrompt: "Replace Save Slot ",
+  clearPrompt: "Clear Save Slot ",
+  restartPrompt: "Restart this run?",
+  savedMessage: "Saved to Slot ",
+  saveFailed: "Could not save. Browser storage may be unavailable.",
+  loadEmpty: " has no readable save.",
+  loadSuccess: "Loaded Slot ",
+  clearedMessage: "Slot ",
+  clearFailed: "Could not clear this save slot.",
+  restartSuccess: "Run restarted.",
+  soundEnabled: "Sound effects enabled.",
+  soundMuted: "Sound effects muted.",
+  keyboardSelected: "Keyboard and mouse selected.",
+  touchSelected: "Dual mobile sticks selected; touch input is a future build step."
+};
 
 const state = {
   inverted: false,
@@ -95,7 +134,7 @@ function applyTheme() {
   document.documentElement.style.setProperty("--ink", color.ink);
   document.documentElement.style.setProperty("--accent", color.accent);
   invertButton.setAttribute("aria-pressed", String(state.inverted));
-  invertButton.textContent = state.inverted ? "INVERT INK: ON" : "INVERT INK: OFF";
+  invertButton.textContent = state.inverted ? uiText.invertOn : uiText.invertOff;
   draw();
 }
 
@@ -138,7 +177,7 @@ function formatSavedAt(value) {
 
 function saveCurrentRun(slot) {
   const previous = readSlot(slot);
-  if (previous && !window.confirm("Replace Save Slot " + slot + "?")) return;
+  if (previous && !window.confirm(uiText.replacePrompt + slot + "?")) return;
   const snapshot = {
     schemaVersion: 1,
     savedAt: new Date().toISOString(),
@@ -149,17 +188,17 @@ function saveCurrentRun(slot) {
   };
   try {
     localStorage.setItem(slotKey(slot), JSON.stringify(snapshot));
-    announce("Saved to Slot " + slot + ".");
+    announce(uiText.savedMessage + slot + ".");
     renderSaveSlots();
   } catch {
-    announce("Could not save. Browser storage may be unavailable.");
+    announce(uiText.saveFailed);
   }
 }
 
 function loadRun(slot) {
   const snapshot = readSlot(slot);
   if (!snapshot || snapshot.schemaVersion !== 1 || !snapshot.player) {
-    announce("Slot " + slot + " has no readable save.");
+    announce(uiText.clearedMessage + slot + uiText.loadEmpty);
     return;
   }
   state.player = {
@@ -172,17 +211,17 @@ function loadRun(slot) {
   soundToggle.checked = state.soundEnabled;
   document.querySelector('input[name="control-scheme"][value="' + state.controlScheme + '"]').checked = true;
   applyTheme();
-  announce("Loaded Slot " + slot + ".");
+  announce(uiText.loadSuccess + slot + ".");
 }
 
 function clearSlot(slot) {
-  if (!window.confirm("Clear Save Slot " + slot + "?")) return;
+  if (!window.confirm(uiText.clearPrompt + slot + "?")) return;
   try {
     localStorage.removeItem(slotKey(slot));
-    announce("Slot " + slot + " cleared.");
+    announce(uiText.clearedMessage + slot + " cleared.");
     renderSaveSlots();
   } catch {
-    announce("Could not clear this save slot.");
+    announce(uiText.clearFailed);
   }
 }
 
@@ -196,26 +235,26 @@ function renderSaveSlots() {
     const description = document.createElement("div");
     const title = document.createElement("p");
     title.className = "slot-title";
-    title.textContent = "SAVE SLOT " + slot;
+    title.textContent = uiText.slotName.replace("{slot}", slot);
     const detail = document.createElement("p");
     detail.className = "slot-detail";
-    detail.textContent = snapshot ? formatSavedAt(snapshot.savedAt) : "EMPTY";
+    detail.textContent = snapshot ? formatSavedAt(snapshot.savedAt) : uiText.empty;
     description.append(title, detail);
 
     const actions = document.createElement("div");
     actions.className = "slot-actions";
     const saveButton = document.createElement("button");
     saveButton.type = "button";
-    saveButton.textContent = "SAVE";
+    saveButton.textContent = uiText.save;
     saveButton.addEventListener("click", () => saveCurrentRun(slot));
     const loadButton = document.createElement("button");
     loadButton.type = "button";
-    loadButton.textContent = "LOAD";
+    loadButton.textContent = uiText.load;
     loadButton.disabled = !snapshot;
     loadButton.addEventListener("click", () => loadRun(slot));
     const clearButton = document.createElement("button");
     clearButton.type = "button";
-    clearButton.textContent = "CLEAR";
+    clearButton.textContent = uiText.clear;
     clearButton.disabled = !snapshot;
     clearButton.addEventListener("click", () => clearSlot(slot));
     actions.append(saveButton, loadButton, clearButton);
@@ -231,12 +270,23 @@ async function applyMenuCopy() {
     if (!response.ok) return;
     const menu = await response.json();
     if (menu.title) document.title = menu.title;
-    const labels = menu.settingsMenu;
-    if (!labels) return;
-    document.querySelector("#settings-title").textContent = labels.title || "PAUSED / SETTINGS";
-    resumeButton.textContent = labels.resume || "RESUME RUN";
-    document.querySelector("#slots-heading").textContent = labels.saveSlots || "SAVE SLOTS";
-    restartButton.textContent = labels.restart || "RESTART RUN";
+    Object.assign(uiText, menu.settingsMenu || {});
+    document.querySelector("#settings-title").textContent = uiText.title;
+    menuButton.textContent = uiText.pauseSettings;
+    resumeButton.textContent = uiText.resume;
+    document.querySelector("#display-heading").textContent = uiText.displayHeading;
+    document.querySelector("#ink-label").textContent = uiText.inkLabel;
+    document.querySelector("#sound-label").textContent = uiText.soundLabel;
+    document.querySelector("#sound-note").textContent = uiText.soundNote;
+    document.querySelector("#controls-heading").textContent = uiText.controlsHeading;
+    document.querySelector("#keyboard-label").textContent = uiText.keyboard;
+    document.querySelector("#touch-label").textContent = uiText.touch;
+    document.querySelector("#touch-note").textContent = uiText.touchNote;
+    document.querySelector("#slots-heading").textContent = uiText.saveSlots;
+    document.querySelector("#slot-storage-note").textContent = uiText.storageNote;
+    restartButton.textContent = uiText.restart;
+    renderSaveSlots();
+    applyTheme();
   } catch {
     // Keep the built-in labels if the menu text file is unavailable.
   }
@@ -276,20 +326,20 @@ invertButton.addEventListener("click", () => {
 });
 soundToggle.addEventListener("change", () => {
   state.soundEnabled = soundToggle.checked;
-  announce(state.soundEnabled ? "Sound effects enabled." : "Sound effects muted.");
+  announce(state.soundEnabled ? uiText.soundEnabled : uiText.soundMuted);
 });
 document.querySelectorAll('input[name="control-scheme"]').forEach((radio) => {
   radio.addEventListener("change", () => {
     if (!radio.checked) return;
     state.controlScheme = radio.value;
-    announce(radio.value === "touch" ? "Dual mobile sticks selected; touch input is a future build step." : "Keyboard and mouse selected.");
+    announce(radio.value === "touch" ? uiText.touchSelected : uiText.keyboardSelected);
   });
 });
 restartButton.addEventListener("click", () => {
-  if (!window.confirm("Restart this run?")) return;
+  if (!window.confirm(uiText.restartPrompt)) return;
   state.player = { x: 0.5, y: 0.76 };
   state.keys.clear();
-  announce("Run restarted.");
+  announce(uiText.restartSuccess);
   draw();
 });
 
