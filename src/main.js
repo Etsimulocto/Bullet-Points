@@ -362,31 +362,21 @@ function draw() {
   context.fillText("DEPTH " + Math.floor(state.world.distance / 10) + " m", width / 2, height * 0.31);
   context.fillText(state.paused ? "PAUSED · TAKE YOUR TIME" : "MOVE · AIM · SURVIVE", width / 2, height * 0.37);
 
-  const px = width * state.player.x;
-  const py = height * state.player.y;
-  context.fillStyle = color.accent;
-  context.beginPath();
-  context.arc(px, py, 10, 0, Math.PI * 2);
-  context.fill();
-  context.fillStyle = color.paper;
-  context.font = "bold 10px 'Courier New', monospace";
-  context.fillText("@", px, py + 3.5);
-  context.fillStyle = color.accent;
-  context.font = "bold 17px 'Courier New', monospace";
-  state.projectiles.forEach(shot => context.fillText("•", shot.x, shot.y));
-
-  if (state.gameOver) {
-    context.fillStyle = state.inverted ? "rgb(0 0 0 / 72%)" : "rgb(244 240 230 / 82%)";
-    context.fillRect(wallWidth, height * 0.38, width - wallWidth * 2, height * 0.22);
-    context.fillStyle = color.accent;
-    context.font = "bold 22px 'Courier New', monospace";
-    context.fillText("ERASED", width / 2, height * 0.47);
-    context.fillStyle = color.ink;
-    context.font = "12px 'Courier New', monospace";
-    context.fillText("PRESS R TO RESTART", width / 2, height * 0.53);
+  context.textAlign = "left";
+  context.font = "bold 12px 'Courier New', monospace";
+  context.fillText("HP " + state.health + "/" + state.maxHealth + "   SHIELD " + state.shields, wallWidth + 12, 20);
+  context.textAlign = "right";
+  context.fillText(getWeapon().projectileGlyph + " " + getWeapon().name + "  [Q / E]", width - wallWidth - 12, 20);
+  if (state.pickupMessageTime > 0) {
+    context.textAlign = "center";
+    context.fillText(state.pickupMessage, width / 2, height * 0.43);
   }
-}
-cale(pulse, pulse);
+
+  state.pickups.forEach(pickup => {
+    const pulse = 1 + Math.sin(state.runTime * 6 + pickup.y * 0.03) * 0.08;
+    context.save();
+    context.translate(pickup.x, pickup.y);
+    context.scale(pulse, pulse);
     context.fillStyle = color.paper;
     context.beginPath();
     context.arc(0, 0, 14, 0, Math.PI * 2);
@@ -396,10 +386,23 @@ cale(pulse, pulse);
     context.stroke();
     context.fillStyle = color.accent;
     context.textAlign = "center";
+    context.textBaseline = "middle";
     context.font = "bold 16px 'Courier New', monospace";
-    context.fillText(pickup.data.glyph || "?", 0, 5);
+    context.fillText(pickup.data.glyph || "?", 0, 0);
     context.restore();
   });
+
+  const px = width * state.player.x;
+  const py = height * state.player.y;
+  context.fillStyle = color.accent;
+  context.beginPath();
+  context.arc(px, py, 10, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = color.paper;
+  context.font = "bold 10px 'Courier New', monospace";
+  context.textAlign = "center";
+  context.textBaseline = "alphabetic";
+  context.fillText("@", px, py + 3.5);
 
   state.projectiles.forEach(shot => {
     context.save();
@@ -441,6 +444,8 @@ cale(pulse, pulse);
     context.fillRect(wallWidth, height * 0.38, width - wallWidth * 2, height * 0.22);
     context.fillStyle = color.accent;
     context.font = "bold 22px 'Courier New', monospace";
+    context.textAlign = "center";
+    context.textBaseline = "alphabetic";
     context.fillText("ERASED", width / 2, height * 0.47);
     context.fillStyle = color.ink;
     context.font = "12px 'Courier New', monospace";
