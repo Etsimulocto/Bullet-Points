@@ -18,3 +18,6 @@ The content schemas are starter formats. They describe editable data; the game e
 
 
 The settings dialog reads its button and status wording from `menu.json`. Three browser-local save slots currently preserve the scaffold player's position and settings; expand the save snapshot when game progress is added.
+
+
+Press F8 to open the built-in JSON editor. It supports one data file at a time, JSON validation, browser-local drafts, downloads, and reset to the repository copy. The data files are not all connected to gameplay yet.
