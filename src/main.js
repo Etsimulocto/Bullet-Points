@@ -1331,7 +1331,7 @@ function spawnStoneRow(width,y,gapSide,gapFraction=.28,word="STONE",setId=""){
   const gapWidth=Math.max(72,Math.min(roomWidth*.38,roomWidth*gapFraction)), wallWidth=roomWidth-gapWidth;
   const kind=word==="GATE"?"gate":word==="LOCK"?"lock":"stone";
   const parts=gapSide==="center"?[{x:left,width:wallWidth/2},{x:left+wallWidth/2+gapWidth,width:wallWidth/2}]:[{x:gapSide==="left"?left+gapWidth:left,width:wallWidth}];
-  return parts.filter(p=>p.width>=52).map(p=>{setCanvasFont(16,"bold");let label=word;while(context.measureText(label).width<p.width-24&&label.length<180)label+=" · "+word;const o={id:(setId||"wall")+"-"+Math.random().toString(36).slice(2,7),kind,word,label,x:p.x,y,width:p.width,height:28,previousY:y,setId};state.obstacles.push(o);return o;});
+  return parts.filter(p=>p.width>=52).map(p=>{setCanvasFont(16,"bold");const saying=horizontalWallWords[Math.floor(Math.random()*horizontalWallWords.length)]||"ROLL FOR INITIATIVE";const motif=word+" · "+saying;let label=motif;while(context.measureText(label).width<p.width-24&&label.length<240)label+=" · "+motif;const o={id:(setId||"wall")+"-"+Math.random().toString(36).slice(2,7),kind,word,label,x:p.x,y,width:p.width,height:28,previousY:y,setId};state.obstacles.push(o);return o;});
 }
 function spawnLockToken(x,y,setId=""){
   const width=44,height=36,o={id:(setId||"lock")+"-token-"+Math.random().toString(36).slice(2,7),kind:"lock",word:"LOCK",label:"LOCK",x:x-width/2,y,width,height,previousY:y,setId};
@@ -1411,10 +1411,12 @@ function spawnWorldDrop(width) {
   const barrierWidth = minWidth + Math.random() * Math.max(0, maxWidth - minWidth);
   const gapSide = state.nextWallSide;
   const x = gapSide === "left" ? left : left + roomWidth - barrierWidth;
-  const word = horizontalWallWords[Math.floor(Math.random() * horizontalWallWords.length)] || "STONE";
-  setCanvasFont(14, "bold");
-  let label = word;
-  while (context.measureText(label).width < barrierWidth - 18) label += " · " + word;
+  const word = "STONE";
+  const saying = horizontalWallWords[Math.floor(Math.random() * horizontalWallWords.length)] || "ROLL FOR INITIATIVE";
+  const motif = word + " · " + saying;
+  setCanvasFont(16, "bold");
+  let label = motif;
+  while (context.measureText(label).width < barrierWidth - 18) label += " · " + motif;
   state.obstacles.push({ kind: "stone", word, label, x, y: -28, width: barrierWidth, height: 26, previousY: -28 });
   state.nextWallSide = gapSide === "left" ? "right" : "left";
 }
