@@ -24,6 +24,9 @@ const gamepadStatus = document.querySelector("#gamepad-status");
 const leftStick = document.querySelector("#left-stick"), rightStick = document.querySelector("#right-stick");
 const leftStickKnob = document.querySelector("#left-stick-knob"), rightStickKnob = document.querySelector("#right-stick-knob");
 const touchSticks = document.querySelector("#touch-sticks"), app = document.querySelector(".app");
+const stage = document.querySelector(".stage");
+const deathWallLine1 = document.querySelector("#death-wall-line-1");
+const deathWallLine2 = document.querySelector("#death-wall-line-2");
 const controlMap = {keyboard:{moveUp:["w","ArrowUp"],moveDown:["s","ArrowDown"],moveLeft:["a","ArrowLeft"],moveRight:["d","ArrowRight"],aimUp:["i"],aimDown:["k"],aimLeft:["j"],aimRight:["l"],fire:[" "]},gamepad:{deadzone:.18,moveAxes:{x:0,y:1},aimAxes:{x:2,y:3},fireButtons:[0,7],dpad:{up:12,down:13,left:14,right:15}},touch:{deadzone:.12,fireWhileRightStickHeld:true}};
 const input = {pad:null,move:{x:0,y:0},aim:{x:0,y:0},touchMove:{x:0,y:0},touchAim:{x:0,y:0},touchFire:false,mouseAim:{x:0,y:0},mouseFire:false};
 let lastGamepadMessage = "";
@@ -222,29 +225,12 @@ function drawScrollingSidewall(x, wallWidth, glyphs, color, side) {
   context.globalAlpha = 1;
 }
 
-function drawDeathWall(height, width, color) {
-  const top = height - roomSettings.deathWallHeight;
-  context.fillStyle = color.accent;
-  context.globalAlpha = state.inverted ? 0.42 : 0.2;
-  context.fillRect(0, top, width, roomSettings.deathWallHeight);
-  context.globalAlpha = 1;
-  context.strokeStyle = color.accent;
-  context.lineWidth = 2;
-  context.beginPath();
-  context.moveTo(0, top);
-  context.lineTo(width, top);
-  context.stroke();
-  context.fillStyle = color.accent;
-  context.font = "bold 12px 'Courier New', monospace";
-  context.textAlign = "center";
-  const lines = roomSettings.deathWallLines;
-  const repeats = Math.max(1, Math.ceil(width / 150));
-  for (let i = 0; i < repeats; i += 1) {
-    const x = width * ((i + 0.5) / repeats);
-    context.fillText(lines[0] || "WALL OF DEATH", x, top + 16);
-    context.fillText(lines[1] || "NO ESCAPE", x, top + 34);
-  }
+function applyDeathWallSettings() {
+  stage.style.setProperty("--death-wall-height", roomSettings.deathWallHeight + "px");
+  deathWallLine1.textContent = roomSettings.deathWallLines[0] || "WALL OF DEATH";
+  deathWallLine2.textContent = roomSettings.deathWallLines[1] || "NO ESCAPE";
 }
+
 function draw() {
   const { width, height } = canvas.getBoundingClientRect();
   const color = colors();
@@ -264,8 +250,6 @@ function draw() {
   context.font = "bold 11px 'Courier New', monospace";
   context.fillText("DEPTH " + Math.floor(state.world.distance / 10) + " m", width / 2, height * 0.31);
   context.fillText(state.paused ? "PAUSED · TAKE YOUR TIME" : "MOVE · AIM · SURVIVE", width / 2, height * 0.37);
-
-  drawDeathWall(height, width, color);
 
   const px = width * state.player.x;
   const py = height * state.player.y;
@@ -347,6 +331,7 @@ async function loadWorldSettings() {
     if (Number.isFinite(room.glyphSpacing)) roomSettings.glyphSpacing = room.glyphSpacing;
     if (Number.isFinite(settings.wallOfDeath?.height)) roomSettings.deathWallHeight = settings.wallOfDeath.height;
     if (Array.isArray(settings.wallOfDeath?.lines) && settings.wallOfDeath.lines.length >= 2) roomSettings.deathWallLines = settings.wallOfDeath.lines.slice(0, 2);
+    applyDeathWallSettings();
     if (typeof room.leftWallGlyphs === "string" && room.leftWallGlyphs.length > 0) roomSettings.leftWallGlyphs = room.leftWallGlyphs;
     if (typeof room.rightWallGlyphs === "string" && room.rightWallGlyphs.length > 0) roomSettings.rightWallGlyphs = room.rightWallGlyphs;
     draw();
@@ -742,6 +727,7 @@ restartButton.addEventListener("click", () => {
 renderSaveSlots();
 applyMenuCopy();
 applyControlScheme();
+applyDeathWallSettings();
 loadControlMap();
 loadWorldSettings();
 resizeCanvas();
