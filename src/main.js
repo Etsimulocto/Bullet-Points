@@ -38,10 +38,10 @@ const SLOT_COUNT = 3;
 const EDITOR_DRAFT_PREFIX = "bulletPoints.editorDraft.";
 const roomSettings = {
   scrollSpeed: 42,
-  killWallSpeed: 65,
   wallWidth: 54,
   glyphSpacing: 26,
-  startHeightRatio: 1.25,
+  deathWallHeight: 44,
+  deathWallLines: ["WALL OF DEATH", "NO ESCAPE"],
   leftWallGlyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
   rightWallGlyphs: "0123456789!?<>+-*/"
 };
@@ -223,37 +223,28 @@ function drawScrollingSidewall(x, wallWidth, glyphs, color, side) {
 }
 
 function drawDeathWall(height, width, color) {
-  const y = state.world.deathWallY ?? height * roomSettings.startHeightRatio;
-  const top = Math.max(0, y);
-  if (y < height) {
-    context.fillStyle = color.accent;
-    context.globalAlpha = 0.92;
-    context.fillRect(0, top, width, height - top);
-    context.globalAlpha = 1;
-    context.fillStyle = color.paper;
-    context.font = "bold 12px 'Courier New', monospace";
-    context.textAlign = "center";
-    const message = "WALL OF DEATH";
-    const repeatCount = Math.max(1, Math.ceil(width / 140));
-    for (let i = 0; i < repeatCount; i += 1) {
-      context.fillText(message, width * ((i + 0.5) / repeatCount), Math.min(height - 8, top + 23));
-    }
-    context.strokeStyle = color.ink;
-    context.lineWidth = 2;
-    context.beginPath();
-    context.moveTo(0, top);
-    context.lineTo(width, top);
-    context.stroke();
-  } else {
-    context.fillStyle = color.accent;
-    context.fillRect(0, height - 3, width, 3);
-    context.fillStyle = color.accent;
-    context.font = "bold 10px 'Courier New', monospace";
-    context.textAlign = "center";
-    context.fillText("WALL OF DEATH BELOW", width / 2, height - 9);
+  const top = height - roomSettings.deathWallHeight;
+  context.fillStyle = color.accent;
+  context.globalAlpha = state.inverted ? 0.42 : 0.2;
+  context.fillRect(0, top, width, roomSettings.deathWallHeight);
+  context.globalAlpha = 1;
+  context.strokeStyle = color.accent;
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(0, top);
+  context.lineTo(width, top);
+  context.stroke();
+  context.fillStyle = color.accent;
+  context.font = "bold 12px 'Courier New', monospace";
+  context.textAlign = "center";
+  const lines = roomSettings.deathWallLines;
+  const repeats = Math.max(1, Math.ceil(width / 150));
+  for (let i = 0; i < repeats; i += 1) {
+    const x = width * ((i + 0.5) / repeats);
+    context.fillText(lines[0] || "WALL OF DEATH", x, top + 16);
+    context.fillText(lines[1] || "NO ESCAPE", x, top + 34);
   }
 }
-
 function draw() {
   const { width, height } = canvas.getBoundingClientRect();
   const color = colors();
@@ -305,7 +296,7 @@ function update(time) {
   const dt = Math.min((time - state.lastTime) / 1000 || 0, 0.04);
   state.lastTime = time;
   const { width, height } = canvas.getBoundingClientRect();
-  if (state.world.deathWallY === null) state.world.deathWallY = height * 1.25;
+  state.world.deathWallY = height - roomSettings.deathWallHeight;
 
   if (!state.paused && !state.gameOver) {
     const controls = readControls();
@@ -318,12 +309,11 @@ function update(time) {
 
     const wallMargin = Math.min(0.18, roomSettings.wallWidth / Math.max(width, 1) + 0.025);
     state.player.x = Math.max(wallMargin, Math.min(1 - wallMargin, state.player.x));
-    state.player.y = Math.max(0.08, Math.min(0.9, state.player.y));
+    state.player.y = Math.max(0.08, Math.min(0.98, state.player.y));
 
     state.world.scrollOffset += dt * roomSettings.scrollSpeed;
     state.world.distance += dt * roomSettings.scrollSpeed;
-    state.world.deathWallY -= dt * roomSettings.killWallSpeed;
-    if (state.world.deathWallY <= height * state.player.y) {
+    if (height * state.player.y + 10 >= state.world.deathWallY) {
       state.gameOver = true;
       state.paused = true;
       state.keys.clear();
@@ -336,7 +326,7 @@ function update(time) {
 function resetRun() {
   const { height } = canvas.getBoundingClientRect();
   state.player = { x: 0.5, y: 0.76 };
-  state.world = { scrollOffset: 0, deathWallY: height * roomSettings.startHeightRatio, distance: 0 };
+  state.world = { scrollOffset: 0, deathWallY: height - roomSettings.deathWallHeight, distance: 0 };
   state.gameOver = false;
   state.projectiles = [];
   state.fireCooldown = 0;
@@ -352,11 +342,11 @@ async function loadWorldSettings() {
     if (!response.ok) return;
     const settings = await response.json();
     if (Number.isFinite(settings.world?.scrollSpeed)) roomSettings.scrollSpeed = settings.world.scrollSpeed;
-    if (Number.isFinite(settings.world?.killWallSpeed)) roomSettings.killWallSpeed = settings.world.killWallSpeed;
     const room = settings.room || {};
     if (Number.isFinite(room.wallWidth)) roomSettings.wallWidth = room.wallWidth;
     if (Number.isFinite(room.glyphSpacing)) roomSettings.glyphSpacing = room.glyphSpacing;
-    if (Number.isFinite(settings.wallOfDeath?.startHeightRatio)) roomSettings.startHeightRatio = settings.wallOfDeath.startHeightRatio;
+    if (Number.isFinite(settings.wallOfDeath?.height)) roomSettings.deathWallHeight = settings.wallOfDeath.height;
+    if (Array.isArray(settings.wallOfDeath?.lines) && settings.wallOfDeath.lines.length >= 2) roomSettings.deathWallLines = settings.wallOfDeath.lines.slice(0, 2);
     if (typeof room.leftWallGlyphs === "string" && room.leftWallGlyphs.length > 0) roomSettings.leftWallGlyphs = room.leftWallGlyphs;
     if (typeof room.rightWallGlyphs === "string" && room.rightWallGlyphs.length > 0) roomSettings.rightWallGlyphs = room.rightWallGlyphs;
     draw();
@@ -562,12 +552,12 @@ function loadRun(slot) {
   if (snapshot.world && Number.isFinite(snapshot.world.scrollOffset)) {
     state.world = {
       scrollOffset: snapshot.world.scrollOffset,
-      deathWallY: Number.isFinite(snapshot.world.deathWallY) ? snapshot.world.deathWallY : canvas.getBoundingClientRect().height * roomSettings.startHeightRatio,
+      deathWallY: Number.isFinite(snapshot.world.deathWallY) ? snapshot.world.deathWallY : canvas.getBoundingClientRect().height - roomSettings.deathWallHeight,
       distance: Number.isFinite(snapshot.world.distance) ? snapshot.world.distance : 0,
     };
   } else {
     const { height } = canvas.getBoundingClientRect();
-    state.world = { scrollOffset: 0, deathWallY: height * roomSettings.startHeightRatio, distance: 0 };
+    state.world = { scrollOffset: 0, deathWallY: height - roomSettings.deathWallHeight, distance: 0 };
   }
   state.gameOver = false;
   state.inverted = Boolean(snapshot.inverted);
