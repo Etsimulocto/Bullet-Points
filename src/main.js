@@ -642,13 +642,28 @@ function update(time) {
     nextPlayerX = Math.max(minX, Math.min(maxX, nextPlayerX));
     nextPlayerY = Math.max(minY, Math.min(maxY, nextPlayerY));
     const nextPx = nextPlayerX * width, nextPy = nextPlayerY * height;
-    if (collidesWithObstacle(nextPx, nextPy)) {
-      const oldPx = previousPlayerX * width, oldPy = previousPlayerY * height;
-      if (!collidesWithObstacle(nextPx, oldPy)) nextPlayerY = previousPlayerY;
-      else if (!collidesWithObstacle(oldPx, nextPy)) nextPlayerX = previousPlayerX;
+    const oldPx = previousPlayerX * width, oldPy = previousPlayerY * height;
+    const startedInsideWall = Boolean(collidesWithObstacle(oldPx, oldPy));
+    const endCollision = collidesWithObstacle(nextPx, nextPy);
+    const sweptCollision = !startedInsideWall && state.obstacles.find(obstacle =>
+      segmentHitsObstacle(oldPx, oldPy, nextPx, nextPy, obstacle)
+    );
+
+    if (endCollision || sweptCollision) {
+      const hitsHorizontalPath = state.obstacles.some(obstacle =>
+        collidesWithObstacle(nextPx, oldPy) === obstacle ||
+        (!startedInsideWall && segmentHitsObstacle(oldPx, oldPy, nextPx, oldPy, obstacle))
+      );
+      const hitsVerticalPath = state.obstacles.some(obstacle =>
+        collidesWithObstacle(oldPx, nextPy) === obstacle ||
+        (!startedInsideWall && segmentHitsObstacle(oldPx, oldPy, oldPx, nextPy, obstacle))
+      );
+
+      if (!hitsVerticalPath) nextPlayerY = previousPlayerY;
+      else if (!hitsHorizontalPath) nextPlayerX = previousPlayerX;
       else {
-        const obstacle = collidesWithObstacle(nextPx, nextPy);
-        nextPlayerY = Math.max(minY, (obstacle.y - obstacle.height / 2 - 12) / height);
+        nextPlayerX = previousPlayerX;
+        nextPlayerY = previousPlayerY;
       }
     }
     state.player.x = nextPlayerX;
@@ -744,6 +759,33 @@ function collidesWithObstacle(x, y) {
     x + radius > obstacle.x && x - radius < obstacle.x + obstacle.width &&
     y + radius > obstacle.y - obstacle.height / 2 && y - radius < obstacle.y + obstacle.height / 2
   );
+}
+
+function segmentHitsObstacle(fromX, fromY, toX, toY, obstacle) {
+  const radius = 10;
+  const left = obstacle.x - radius;
+  const right = obstacle.x + obstacle.width + radius;
+  const top = obstacle.y - obstacle.height / 2 - radius;
+  const bottom = obstacle.y + obstacle.height / 2 + radius;
+  let enter = 0;
+  let leave = 1;
+
+  for (const [origin, delta, min, max] of [
+    [fromX, toX - fromX, left, right],
+    [fromY, toY - fromY, top, bottom]
+  ]) {
+    if (Math.abs(delta) < 0.0001) {
+      if (origin < min || origin > max) return false;
+      continue;
+    }
+    let near = (min - origin) / delta;
+    let far = (max - origin) / delta;
+    if (near > far) [near, far] = [far, near];
+    enter = Math.max(enter, near);
+    leave = Math.min(leave, far);
+    if (enter > leave) return false;
+  }
+  return leave >= 0 && enter <= 1;
 }
 
 async function loadWorldSettings() {
