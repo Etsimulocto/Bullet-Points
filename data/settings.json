@@ -7,7 +7,7 @@
   },
   "world": {
     "scrollSpeed": 42,
-    "killWallSpeed": 30,
+    "killWallSpeed": 65,
     "spawnInterval": 1.4
   },
   "player": {
@@ -17,5 +17,16 @@
   "display": {
     "orientation": "portrait",
     "showTouchControls": "auto"
+  },
+  "room": {
+    "wallWidth": 54,
+    "glyphSpacing": 26,
+    "leftWallGlyphs": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    "rightWallGlyphs": "0123456789!?<>+-*/"
+  },
+  "wallOfDeath": {
+    "label": "WALL OF DEATH",
+    "hitText": "ERASED",
+    "startHeightRatio": 1.25
   }
 }
