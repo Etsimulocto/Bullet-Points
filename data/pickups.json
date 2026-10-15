@@ -33,7 +33,7 @@
     {
       "id": "arsenal",
       "name": "LOST FOOTNOTE",
-      "description": "Unlock and equip a new weapon.",
+      "description": "Switch to a random weapon.",
       "glyph": "†",
       "effect": "grantWeapon",
       "amount": "random",
