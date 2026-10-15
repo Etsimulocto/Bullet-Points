@@ -148,6 +148,13 @@ const state = {
   world: { scrollOffset: 0, deathWallY: null, distance: 0 }, lastTime: 0,
 };
 
+function hasCompleteEnemyRoster(data) {
+  const enemies = data?.enemies;
+  if (!Array.isArray(enemies) || enemies.length !== 26) return false;
+  const letters = new Set(enemies.map(enemy => String(enemy?.letter || "").toUpperCase()));
+  return letters.size === 26 && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").every(letter => letters.has(letter));
+}
+
 async function loadCombatData() {
   try {
     const [weaponResponse, pickupResponse, enemyResponse] = await Promise.all([
@@ -171,8 +178,17 @@ async function loadCombatData() {
     if (enemyResponse.ok) {
       let data = await enemyResponse.json();
       try {
-        const draft = localStorage.getItem(EDITOR_DRAFT_PREFIX + "../data/enemies.json");
-        if (draft) data = JSON.parse(draft);
+        const draftKey = EDITOR_DRAFT_PREFIX + "../data/enemies.json";
+        const draft = localStorage.getItem(draftKey);
+        if (draft !== null) {
+          const draftData = JSON.parse(draft);
+          if (hasCompleteEnemyRoster(draftData)) {
+            data = draftData;
+          } else {
+            localStorage.setItem(EDITOR_DRAFT_PREFIX + "legacy-enemies-backup", draft);
+            localStorage.removeItem(draftKey);
+          }
+        }
       } catch {}
       if (Array.isArray(data.enemies)) enemyList = data.enemies.filter(enemy => enemy && enemy.id && enemy.letter && enemy.name);
     }
@@ -1139,12 +1155,16 @@ function renderEnemyTuner() {
   if (!Array.isArray(data.enemies) || !data.enemies.length) return;
   const previousSelection = enemyTunerSelect.value;
   enemyTunerSelect.replaceChildren();
-  data.enemies.forEach(enemy => {
-    const option = document.createElement("option");
-    option.value = enemy.id;
-    option.textContent = enemy.letter + " · " + enemy.name;
-    enemyTunerSelect.append(option);
-  });
+  [...data.enemies]
+    .sort((a, b) => String(a?.letter || "").localeCompare(String(b?.letter || "")))
+    .forEach(enemy => {
+      const option = document.createElement("option");
+      option.value = enemy?.id || "";
+      const letter = String(enemy?.letter || enemy?.id?.[0] || "?").toUpperCase();
+      const name = String(enemy?.name || "Unnamed enemy");
+      option.textContent = letter + " · " + name;
+      enemyTunerSelect.append(option);
+    });
   enemyTunerSelect.value = data.enemies.some(enemy => enemy.id === previousSelection) ? previousSelection : data.enemies[0].id;
   const enemy = data.enemies.find(entry => entry.id === enemyTunerSelect.value) || data.enemies[0];
   enemyTunerFields.replaceChildren();
@@ -1237,14 +1257,28 @@ async function loadEditorFile(path, allowDiscard = false) {
   editorFilePath.textContent = path.replace("../", "");
   editorDirty = false;
   try {
-    const draft = localStorage.getItem(editorDraftKey(path));
+    const draftKey = editorDraftKey(path);
+    const draft = localStorage.getItem(draftKey);
     if (draft !== null) {
-      editorText.value = draft;
-      setEditorStatus("Loaded your browser-local draft. Save it as a file when ready.");
-      renderEnemyTuner();
-      try { refreshEnemyRosterFromEditor(JSON.parse(draft)); } catch {}
-      editorLoaded = true;
-      return;
+      let useDraft = true;
+      if (path === "../data/enemies.json") {
+        let draftData;
+        try { draftData = JSON.parse(draft); } catch { draftData = null; }
+        if (!hasCompleteEnemyRoster(draftData)) {
+          localStorage.setItem(EDITOR_DRAFT_PREFIX + "legacy-enemies-backup", draft);
+          localStorage.removeItem(draftKey);
+          useDraft = false;
+          setEditorStatus("Replaced an old enemy draft with the complete A–Z roster. The old draft is backed up in this browser.");
+        }
+      }
+      if (useDraft) {
+        editorText.value = draft;
+        setEditorStatus("Loaded your browser-local draft. Save it as a file when ready.");
+        renderEnemyTuner();
+        try { refreshEnemyRosterFromEditor(JSON.parse(draft)); } catch {}
+        editorLoaded = true;
+        return;
+      }
     }
   } catch {
     // Continue by loading the repository version if local storage is unavailable.
