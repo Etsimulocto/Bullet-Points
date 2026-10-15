@@ -12,28 +12,30 @@
 
     <section class="stage" aria-label="Game viewport">
       <canvas id="game" aria-label="Bullet Points game canvas"></canvas>
-  <header class="topbar">
-      <div>
-        <p class="eyebrow">AN INFINITE WORD DUNGEON</p>
-        <h1>Bullet Points</h1>
+      <div id="death-wall" class="death-wall" aria-label="Wall of Death and game HUD">
+        <div class="death-wall-header">
+          <div class="death-wall-title">
+            <p class="eyebrow">AN INFINITE WORD DUNGEON</p>
+            <h1>Bullet Points</h1>
+          </div>
+          <div class="topbar-actions">
+            <button id="editor-toggle" class="outline-button" type="button" aria-controls="editor-panel">EDITOR [F8]</button>
+            <button id="menu-button" class="outline-button" type="button" aria-haspopup="dialog"><span aria-hidden="true">Ⅱ</span> PAUSE / SETTINGS</button>
+          </div>
+        </div>
+        <div class="game-hud" aria-live="polite">
+          <label class="health-readout"><span>HP</span><progress id="health-meter" max="3" value="3">3/3</progress><span id="health-text">3/3</span></label>
+          <span id="lives-readout">LIVES ●●●</span>
+          <span id="score-readout">PTS 0</span>
+          <span id="depth-readout">DEPTH 0 m</span>
+          <span id="weapon-readout">. PERIOD PISTOL</span>
+          <span id="pickup-message" aria-live="polite"></span>
+        </div>
         <p class="control-hint">MOVE WASD / ARROWS · AIM IJKL / MOUSE · FIRE SPACE / CLICK · Q/E SWAP · PAD LB/RB</p>
-      </div>
-      <div class="topbar-actions">
-        <button id="editor-toggle" class="outline-button" type="button" aria-controls="editor-panel">EDITOR [F8]</button>
-        <button id="menu-button" class="outline-button" type="button" aria-haspopup="dialog">
-        <span aria-hidden="true">Ⅱ</span> PAUSE / SETTINGS
-      </button>
-      </div>
-  </header>
-      <div class="game-hud" aria-live="polite">
-        <label class="health-readout"><span>HP</span><progress id="health-meter" max="3" value="3">3/3</progress><span id="health-text">3/3</span></label>
-        <span id="lives-readout">LIVES ●●●</span>
-        <span id="score-readout">PTS 0</span>
-        <span id="weapon-readout">. PERIOD PISTOL</span>
-      </div>
-      <div id="death-wall" class="death-wall" aria-label="Wall of Death boundary">
-        <span id="death-wall-line-1">WALL OF DEATH</span>
-        <span id="death-wall-line-2">NO ESCAPE</span>
+        <div class="death-wall-warning">
+          <span id="death-wall-line-1">WALL OF DEATH</span>
+          <span id="death-wall-line-2">NO ESCAPE</span>
+        </div>
       </div>
       <div id="touch-sticks" class="touch-sticks" hidden aria-label="Touch controls">
         <div id="left-stick" class="virtual-stick" role="application" aria-label="Move joystick"><span class="stick-caption">MOVE</span><span id="left-stick-knob" class="stick-knob"></span></div>
