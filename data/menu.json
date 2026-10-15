@@ -1,0 +1,22 @@
+{
+  "title": "Bullet Points",
+  "subtitle": "An Infinite Word Dungeon",
+  "buttons": [
+    { "id": "play", "label": "START RUN" },
+    { "id": "editor", "label": "FEED EDITOR" },
+    { "id": "settings", "label": "SETTINGS" },
+    { "id": "credits", "label": "CREDITS" }
+  ],
+  "labels": {
+    "move": "WASD / ARROWS TO MOVE",
+    "aim": "AIM AND FIRE",
+    "mobile": "LEFT STICK: MOVE · RIGHT STICK: AIM / FIRE",
+    "invert": "INVERT INK",
+    "gameOver": "THE PAGE CAUGHT YOU",
+    "retry": "TRY AGAIN"
+  },
+  "messages": {
+    "loading": "TURNING THE PAGE…",
+    "editorUnsaved": "UNSAVED FEED CHANGES"
+  }
+}
