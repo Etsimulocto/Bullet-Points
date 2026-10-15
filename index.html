@@ -42,11 +42,11 @@
     <section class="menu-section" aria-labelledby="display-heading">
       <h3 id="display-heading">DISPLAY & SOUND</h3>
       <div class="setting-row">
-        <span>Ink colors</span>
+        <span id="ink-label">Ink colors</span>
         <button id="invert-button" class="outline-button" type="button" aria-pressed="false">INVERT INK: OFF</button>
       </div>
       <label class="setting-row" for="sound-toggle">
-        <span>Sound effects <small>(ready for audio)</small></span>
+        <span><span id="sound-label">Sound effects</span> <small id="sound-note">(ready for audio)</small></span>
         <input id="sound-toggle" type="checkbox" checked>
       </label>
     </section>
@@ -55,18 +55,18 @@
       <h3 id="controls-heading">CONTROLS</h3>
       <label class="choice-row">
         <input type="radio" name="control-scheme" value="keyboard" checked>
-        <span>Keyboard and mouse</span>
+        <span id="keyboard-label">Keyboard and mouse</span>
       </label>
       <label class="choice-row">
         <input type="radio" name="control-scheme" value="touch">
-        <span>Dual mobile sticks <small>(input support is planned)</small></span>
+        <span><span id="touch-label">Dual mobile sticks</span> <small id="touch-note">(input support is planned)</small></span>
       </label>
     </section>
 
     <section class="menu-section" aria-labelledby="slots-heading">
       <div class="section-title-row">
         <h3 id="slots-heading">SAVE SLOTS</h3>
-        <small>Stored in this browser</small>
+        <small id="slot-storage-note">Stored in this browser</small>
       </div>
       <div id="save-slots" class="save-slots"></div>
     </section>
