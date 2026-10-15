@@ -29,6 +29,14 @@ const palette = {
 const SLOT_PREFIX = "bulletPoints.saveSlot.";
 const SLOT_COUNT = 3;
 const EDITOR_DRAFT_PREFIX = "bulletPoints.editorDraft.";
+const roomSettings = {
+  scrollSpeed: 42,
+  killWallSpeed: 65,
+  wallWidth: 54,
+  glyphSpacing: 26,
+  leftWallGlyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+  rightWallGlyphs: "0123456789!?<>+-*/"
+};
 const uiText = {
   title: "PAUSED / SETTINGS",
   pauseSettings: "Ⅱ PAUSE / SETTINGS",
@@ -80,6 +88,8 @@ const state = {
   controlScheme: "keyboard",
   keys: new Set(),
   player: { x: 0.5, y: 0.76 },
+  gameOver: false,
+  world: { scrollOffset: 0, deathWallY: null, distance: 0 },
   lastTime: 0,
 };
 
@@ -98,6 +108,70 @@ function colors() {
     : palette;
 }
 
+function drawScrollingSidewall(x, wallWidth, glyphs, color, side) {
+  const { height } = canvas.getBoundingClientRect();
+  const spacing = roomSettings.glyphSpacing;
+  const phase = state.world.scrollOffset % spacing;
+  context.fillStyle = state.inverted ? "#252525" : "#e9e2d2";
+  context.fillRect(x, 0, wallWidth, height);
+  context.fillStyle = color.ink;
+  context.textAlign = "center";
+  context.font = "bold 13px 'Courier New', monospace";
+  const rows = Math.ceil(height / spacing) + 2;
+  for (let row = 0; row < rows; row += 1) {
+    const y = -spacing + phase + row * spacing;
+    const streamRow = Math.floor(state.world.scrollOffset / spacing) + row - 1;
+    for (let column = 0; column < 3; column += 1) {
+      const index = ((streamRow + column * (side === "left" ? 5 : 9)) % glyphs.length + glyphs.length) % glyphs.length;
+      const character = glyphs[index];
+      const xPosition = x + wallWidth * ((column + 0.5) / 3);
+      context.globalAlpha = 0.48 + ((streamRow + column) % 3) * 0.16;
+      context.fillText(character, xPosition, y);
+    }
+  }
+  context.globalAlpha = 1;
+  context.strokeStyle = color.ink;
+  context.globalAlpha = 0.55;
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(side === "left" ? x + wallWidth : x, 0);
+  context.lineTo(side === "left" ? x + wallWidth : x, height);
+  context.stroke();
+  context.globalAlpha = 1;
+}
+
+function drawDeathWall(height, width, color) {
+  const y = state.world.deathWallY ?? height * 1.25;
+  const top = Math.max(0, y);
+  if (y < height) {
+    context.fillStyle = color.accent;
+    context.globalAlpha = 0.92;
+    context.fillRect(0, top, width, height - top);
+    context.globalAlpha = 1;
+    context.fillStyle = color.paper;
+    context.font = "bold 12px 'Courier New', monospace";
+    context.textAlign = "center";
+    const message = "WALL OF DEATH";
+    const repeatCount = Math.max(1, Math.ceil(width / 140));
+    for (let i = 0; i < repeatCount; i += 1) {
+      context.fillText(message, width * ((i + 0.5) / repeatCount), Math.min(height - 8, top + 23));
+    }
+    context.strokeStyle = color.ink;
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(0, top);
+    context.lineTo(width, top);
+    context.stroke();
+  } else {
+    context.fillStyle = color.accent;
+    context.fillRect(0, height - 3, width, 3);
+    context.fillStyle = color.accent;
+    context.font = "bold 10px 'Courier New', monospace";
+    context.textAlign = "center";
+    context.fillText("WALL OF DEATH BELOW", width / 2, height - 9);
+  }
+}
+
 function draw() {
   const { width, height } = canvas.getBoundingClientRect();
   const color = colors();
@@ -105,13 +179,20 @@ function draw() {
   context.fillStyle = color.paper;
   context.fillRect(0, 0, width, height);
 
+  const wallWidth = Math.min(roomSettings.wallWidth, Math.max(34, width * 0.16));
+  drawScrollingSidewall(0, wallWidth, roomSettings.leftWallGlyphs, color, "left");
+  drawScrollingSidewall(width - wallWidth, wallWidth, roomSettings.rightWallGlyphs, color, "right");
+
   context.fillStyle = color.ink;
-  context.font = "14px 'Courier New', monospace";
   context.textAlign = "center";
-  context.fillText("THE DUNGEON IS A SENTENCE", width / 2, height * 0.31);
+  context.font = "14px 'Courier New', monospace";
+  context.fillText("THE DUNGEON IS A SENTENCE", width / 2, height * 0.26);
   context.fillStyle = color.accent;
   context.font = "bold 11px 'Courier New', monospace";
+  context.fillText("DEPTH " + Math.floor(state.world.distance / 10) + " m", width / 2, height * 0.31);
   context.fillText(state.paused ? "PAUSED · TAKE YOUR TIME" : "MOVE · AIM · SURVIVE", width / 2, height * 0.37);
+
+  drawDeathWall(height, width, color);
 
   const px = width * state.player.x;
   const py = height * state.player.y;
@@ -122,22 +203,77 @@ function draw() {
   context.fillStyle = color.paper;
   context.font = "bold 10px 'Courier New', monospace";
   context.fillText("@", px, py + 3.5);
+
+  if (state.gameOver) {
+    context.fillStyle = state.inverted ? "rgb(0 0 0 / 72%)" : "rgb(244 240 230 / 82%)";
+    context.fillRect(wallWidth, height * 0.38, width - wallWidth * 2, height * 0.22);
+    context.fillStyle = color.accent;
+    context.font = "bold 22px 'Courier New', monospace";
+    context.fillText("ERASED", width / 2, height * 0.47);
+    context.fillStyle = color.ink;
+    context.font = "12px 'Courier New', monospace";
+    context.fillText("PRESS R TO RESTART", width / 2, height * 0.53);
+  }
 }
 
 function update(time) {
   const dt = Math.min((time - state.lastTime) / 1000 || 0, 0.04);
   state.lastTime = time;
-  if (!state.paused) {
-    const speed = dt * 0.45;
-    if (state.keys.has("ArrowLeft") || state.keys.has("a")) state.player.x -= speed;
-    if (state.keys.has("ArrowRight") || state.keys.has("d")) state.player.x += speed;
-    if (state.keys.has("ArrowUp") || state.keys.has("w")) state.player.y -= speed;
-    if (state.keys.has("ArrowDown") || state.keys.has("s")) state.player.y += speed;
-    state.player.x = Math.max(0.04, Math.min(0.96, state.player.x));
-    state.player.y = Math.max(0.08, Math.min(0.92, state.player.y));
+  const { width, height } = canvas.getBoundingClientRect();
+  if (state.world.deathWallY === null) state.world.deathWallY = height * 1.25;
+
+  if (!state.paused && !state.gameOver) {
+    const horizontalSpeed = dt * 0.45;
+    const verticalSpeed = dt * 0.11;
+    if (state.keys.has("ArrowLeft") || state.keys.has("a")) state.player.x -= horizontalSpeed;
+    if (state.keys.has("ArrowRight") || state.keys.has("d")) state.player.x += horizontalSpeed;
+    if (state.keys.has("ArrowUp") || state.keys.has("w")) state.player.y -= verticalSpeed;
+    if (state.keys.has("ArrowDown") || state.keys.has("s")) state.player.y += verticalSpeed;
+
+    const wallMargin = Math.min(0.18, roomSettings.wallWidth / Math.max(width, 1) + 0.025);
+    state.player.x = Math.max(wallMargin, Math.min(1 - wallMargin, state.player.x));
+    state.player.y = Math.max(0.08, Math.min(0.9, state.player.y));
+
+    state.world.scrollOffset += dt * roomSettings.scrollSpeed;
+    state.world.distance += dt * roomSettings.scrollSpeed;
+    state.world.deathWallY -= dt * roomSettings.killWallSpeed;
+    if (state.world.deathWallY <= height * state.player.y) {
+      state.gameOver = true;
+      state.paused = true;
+      state.keys.clear();
+    }
   }
   draw();
   requestAnimationFrame(update);
+}
+
+function resetRun() {
+  const { height } = canvas.getBoundingClientRect();
+  state.player = { x: 0.5, y: 0.76 };
+  state.world = { scrollOffset: 0, deathWallY: height * 1.25, distance: 0 };
+  state.gameOver = false;
+  state.paused = dialog.open || !editorPanel.hidden;
+  state.keys.clear();
+  state.lastTime = 0;
+  draw();
+}
+
+async function loadWorldSettings() {
+  try {
+    const response = await fetch(new URL("../data/settings.json", import.meta.url));
+    if (!response.ok) return;
+    const settings = await response.json();
+    if (Number.isFinite(settings.world?.scrollSpeed)) roomSettings.scrollSpeed = settings.world.scrollSpeed;
+    if (Number.isFinite(settings.world?.killWallSpeed)) roomSettings.killWallSpeed = settings.world.killWallSpeed;
+    const room = settings.room || {};
+    if (Number.isFinite(room.wallWidth)) roomSettings.wallWidth = room.wallWidth;
+    if (Number.isFinite(room.glyphSpacing)) roomSettings.glyphSpacing = room.glyphSpacing;
+    if (typeof room.leftWallGlyphs === "string" && room.leftWallGlyphs.length > 0) roomSettings.leftWallGlyphs = room.leftWallGlyphs;
+    if (typeof room.rightWallGlyphs === "string" && room.rightWallGlyphs.length > 0) roomSettings.rightWallGlyphs = room.rightWallGlyphs;
+    draw();
+  } catch {
+    // Use the built-in room values if settings cannot be loaded.
+  }
 }
 
 function announce(message) {
@@ -310,6 +446,7 @@ function saveCurrentRun(slot) {
     schemaVersion: 1,
     savedAt: new Date().toISOString(),
     player: { x: state.player.x, y: state.player.y },
+    world: { ...state.world },
     inverted: state.inverted,
     soundEnabled: state.soundEnabled,
     controlScheme: state.controlScheme,
@@ -333,6 +470,16 @@ function loadRun(slot) {
     x: Number.isFinite(snapshot.player.x) ? Math.max(0.04, Math.min(0.96, snapshot.player.x)) : 0.5,
     y: Number.isFinite(snapshot.player.y) ? Math.max(0.08, Math.min(0.92, snapshot.player.y)) : 0.76,
   };
+  if (snapshot.world && Number.isFinite(snapshot.world.scrollOffset)) {
+    state.world = {
+      scrollOffset: snapshot.world.scrollOffset,
+      deathWallY: Number.isFinite(snapshot.world.deathWallY) ? snapshot.world.deathWallY : canvas.getBoundingClientRect().height * 1.25,
+      distance: Number.isFinite(snapshot.world.distance) ? snapshot.world.distance : 0,
+    };
+  } else {
+    resetRun();
+  }
+  state.gameOver = false;
   state.inverted = Boolean(snapshot.inverted);
   state.soundEnabled = snapshot.soundEnabled !== false;
   state.controlScheme = snapshot.controlScheme === "touch" ? "touch" : "keyboard";
@@ -488,13 +635,12 @@ document.querySelectorAll('input[name="control-scheme"]').forEach((radio) => {
 });
 restartButton.addEventListener("click", () => {
   if (!window.confirm(uiText.restartPrompt)) return;
-  state.player = { x: 0.5, y: 0.76 };
-  state.keys.clear();
+  resetRun();
   announce(uiText.restartSuccess);
-  draw();
 });
 
 renderSaveSlots();
 applyMenuCopy();
+loadWorldSettings();
 resizeCanvas();
 requestAnimationFrame(update);
