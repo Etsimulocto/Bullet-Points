@@ -1,0 +1,22 @@
+{
+  "name": "First Page",
+  "version": 1,
+  "description": "Starter feed for the first Bullet Points run.",
+  "colors": {
+    "paper": "#f4f0e6",
+    "ink": "#191919",
+    "accent": "#d84b3e",
+    "invertEnabled": true
+  },
+  "world": {
+    "scrollSpeed": 42,
+    "killWallSpeed": 30,
+    "spawnInterval": 1.4
+  },
+  "words": {
+    "background": ["THE", "AND", "OR", "BUT", "THEN", "BECAUSE"],
+    "walls": ["STONE", "WALL", "BLOCK", "BARRIER"],
+    "doors": ["DOOR", "GATE", "LOCK"],
+    "enemies": ["HUNGER", "ERROR", "MIMIC", "GOBLIN"]
+  }
+}
