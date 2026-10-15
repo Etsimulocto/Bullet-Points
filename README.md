@@ -36,7 +36,11 @@ Open `http://localhost:8080` in a browser. To test from a phone on the same Wi-F
 
 ## Editing
 
-For normal content changes, edit the matching JSON file under `data/`. For example, change words in `data/word-sets/default.json`, weapon tuning in `data/weapons.json`, or menu text in `data/menu.json`. Keep JSON syntax valid. The editor UI and game-side loading/behavior still need to be implemented.
+For normal content changes, edit the matching JSON file under `data/`. For example, change words in `data/word-sets/default.json`, weapon tuning in `data/weapons.json`, or menu text in `data/menu.json`. Keep JSON syntax valid. The built-in rough editor opens with F8 and edits one JSON data file at a time. It saves drafts in the current browser or downloads a JSON file; only menu labels and the existing scaffold settings are currently consumed by the game.
+
+## Feed editor
+
+Press **F8** or click **EDITOR [F8]** to open the side editor. Choose a JSON file, edit it, check syntax, then save a browser-local draft or download the file. Press F8, Escape, or × to close. On narrow screens the editor fills the screen. Drafts are local to the current browser; downloaded JSON files are the portable copy.
 
 ## Pause menu and save slots
 
