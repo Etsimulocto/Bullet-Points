@@ -916,8 +916,8 @@ function draw() {
     context.beginPath();
     context.rect(obstacle.x, obstacle.y - obstacle.height / 2, obstacle.width, obstacle.height);
     context.clip();
-    const obstacleColor = obstacle.kind === "gate" ? "#278da5" : obstacle.kind === "lock" ? "#e49b32" : color.accent;
-    context.fillStyle = color.paper;
+    const obstacleColor = obstacle.kind === "gate" ? "#278da5" : obstacle.kind === "lock" ? "#e49b32" : obstacle.kind === "stone" ? "#77736a" : color.accent;
+    context.fillStyle = obstacle.kind === "stone" ? (state.inverted ? "#252525" : "#ddd8cb") : color.paper;
     context.fillRect(obstacle.x, obstacle.y - obstacle.height / 2, obstacle.width, obstacle.height);
     context.strokeStyle = obstacleColor;
     context.lineWidth = obstacle.kind === "gate" ? 3 : 2;
@@ -925,8 +925,7 @@ function draw() {
     context.fillStyle = color.ink;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    setCanvasFont(16, "bold");
-    context.fillText(obstacle.label, obstacle.x + obstacle.width / 2, obstacle.y, Math.max(24, obstacle.width - 12));
+    if (obstacle.label) { setCanvasFont(16, "bold"); context.fillText(obstacle.label, obstacle.x + obstacle.width / 2, obstacle.y, Math.max(24, obstacle.width - 12)); }
     context.restore();
   });
 
@@ -940,8 +939,9 @@ function draw() {
     context.fillStyle = color.ink;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    setCanvasFont(Math.max(14, Math.min(18, block.size * 0.30)), "bold");
-    context.fillText(block.label || "BLOCK", block.x, block.y, block.size - 8);
+    context.strokeStyle = "#8d5a12";
+    context.lineWidth = 1;
+    context.strokeRect(block.x - block.size * 0.32, block.y - block.size * 0.32, block.size * 0.64, block.size * 0.64);
     if (block.sliding) { context.fillStyle = "#d97706"; setCanvasFont(9, "bold"); context.fillText("↔", block.x, block.y + block.size / 2 + 8); }
     context.restore();
   });
@@ -1326,12 +1326,12 @@ function spawnEnemy(width) {
   spawnEnemyData(data, left + Math.random() * (right - left), -24);
 }
 
-function spawnStoneRow(width,y,gapSide,gapFraction=.28,word="STONE",setId=""){
+function spawnStoneRow(width,y,gapSide,gapFraction=.28,word="STONE",setId="",kindOverride=""){
   const left=roomSettings.wallWidth+12, roomWidth=Math.max(100,width-roomSettings.wallWidth*2-24);
   const gapWidth=Math.max(72,Math.min(roomWidth*.38,roomWidth*gapFraction)), wallWidth=roomWidth-gapWidth;
-  const kind=word==="GATE"?"gate":word==="LOCK"?"lock":"stone";
+  const kind=kindOverride||(word==="GATE"?"gate":word==="LOCK"?"lock":"stone");
   const parts=gapSide==="center"?[{x:left,width:wallWidth/2},{x:left+wallWidth/2+gapWidth,width:wallWidth/2}]:[{x:gapSide==="left"?left+gapWidth:left,width:wallWidth}];
-  return parts.filter(p=>p.width>=52).map(p=>{setCanvasFont(16,"bold");const saying=horizontalWallWords[Math.floor(Math.random()*horizontalWallWords.length)]||"ROLL FOR INITIATIVE";const motif=word+" · "+saying;let label=motif;while(context.measureText(label).width<p.width-24&&label.length<240)label+=" · "+motif;const o={id:(setId||"wall")+"-"+Math.random().toString(36).slice(2,7),kind,word,label,x:p.x,y,width:p.width,height:28,previousY:y,setId};state.obstacles.push(o);return o;});
+  return parts.filter(p=>p.width>=52).map(p=>{let label="";if(kind==="wordWall"){setCanvasFont(16,"bold");label=word;while(context.measureText(label).width<p.width-24&&label.length<240)label+=" · "+word;}const o={id:(setId||"wall")+"-"+Math.random().toString(36).slice(2,7),kind,word,label,x:p.x,y,width:p.width,height:28,previousY:y,setId};state.obstacles.push(o);return o;});
 }
 function spawnLockToken(x,y,setId=""){
   const width=44,height=36,o={id:(setId||"lock")+"-token-"+Math.random().toString(36).slice(2,7),kind:"lock",word:"LOCK",label:"LOCK",x:x-width/2,y,width,height,previousY:y,setId};
@@ -1411,13 +1411,11 @@ function spawnWorldDrop(width) {
   const barrierWidth = minWidth + Math.random() * Math.max(0, maxWidth - minWidth);
   const gapSide = state.nextWallSide;
   const x = gapSide === "left" ? left : left + roomWidth - barrierWidth;
-  const word = "STONE";
-  const saying = horizontalWallWords[Math.floor(Math.random() * horizontalWallWords.length)] || "ROLL FOR INITIATIVE";
-  const motif = word + " · " + saying;
+  const word = horizontalWallWords[Math.floor(Math.random() * horizontalWallWords.length)] || "ROLL FOR INITIATIVE";
   setCanvasFont(16, "bold");
-  let label = motif;
-  while (context.measureText(label).width < barrierWidth - 18) label += " · " + motif;
-  state.obstacles.push({ kind: "stone", word, label, x, y: -28, width: barrierWidth, height: 26, previousY: -28 });
+  let label = word;
+  while (context.measureText(label).width < barrierWidth - 18) label += " · " + word;
+  state.obstacles.push({ kind: "wordWall", word, label, x, y: -28, width: barrierWidth, height: 26, previousY: -28 });
   state.nextWallSide = gapSide === "left" ? "right" : "left";
 }
 
@@ -1802,8 +1800,8 @@ function renderSpawnTools() {
 }
 
 function spawnTestObstacle(word, width, y, index = 0) {
-  const cleanWord = String(word || "STONE").trim().toUpperCase();
-  spawnStoneRow(width, y, ["left", "right", "center"][index % 3], 0.3, cleanWord === "GATE" ? "GATE" : cleanWord === "LOCK" ? "LOCK" : "STONE");
+  const cleanWord = String(word || "WORD").trim().toUpperCase();
+  spawnStoneRow(width, y, ["left", "right", "center"][index % 3], 0.3, cleanWord, "", "wordWall");
 }
 
 function spawnEditorItem(kind, item, index, total, width, height) {
