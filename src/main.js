@@ -1330,7 +1330,7 @@ async function loadEditorFile(path, allowDiscard = false) {
   editorFileSelect.value = path;
   editorFilePath.textContent = path.replace("../", "");
   editorDirty = false;
-  let replacedLegacyEnemyDraft = false;
+  let replacedLegacyDraft = false;
   try {
     const draftKey = editorDraftKey(path);
     const draft = localStorage.getItem(draftKey);
@@ -1343,7 +1343,16 @@ async function loadEditorFile(path, allowDiscard = false) {
           localStorage.setItem(EDITOR_DRAFT_PREFIX + "legacy-enemies-backup", draft);
           localStorage.removeItem(draftKey);
           useDraft = false;
-          replacedLegacyEnemyDraft = true;
+          replacedLegacyDraft = true;
+        }
+      } else if (path === "../data/pickups.json") {
+        let draftData;
+        try { draftData = JSON.parse(draft); } catch { draftData = null; }
+        if (Number(draftData?.version) < 2) {
+          localStorage.setItem(EDITOR_DRAFT_PREFIX + "legacy-pickups-backup", draft);
+          localStorage.removeItem(draftKey);
+          useDraft = false;
+          replacedLegacyDraft = true;
         }
       }
       if (useDraft) {
@@ -1364,8 +1373,10 @@ async function loadEditorFile(path, allowDiscard = false) {
     const data = await response.text();
     JSON.parse(data);
     editorText.value = JSON.stringify(JSON.parse(data), null, 2);
-    setEditorStatus(replacedLegacyEnemyDraft
-      ? "Loaded the complete A–Z roster. Your old enemy draft is backed up in this browser."
+    setEditorStatus(replacedLegacyDraft
+      ? path === "../data/enemies.json"
+        ? "Loaded the complete A–Z roster. Your old enemy draft is backed up in this browser."
+        : "Loaded the updated pickup list. Your old pickup draft is backed up in this browser."
       : "Loaded the repository version.");
     renderEnemyTuner();
     if (path === "../data/enemies.json") refreshEnemyRosterFromEditor(JSON.parse(data));
