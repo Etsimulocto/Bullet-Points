@@ -34,6 +34,7 @@ const roomSettings = {
   killWallSpeed: 65,
   wallWidth: 54,
   glyphSpacing: 26,
+  startHeightRatio: 1.25,
   leftWallGlyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
   rightWallGlyphs: "0123456789!?<>+-*/"
 };
@@ -141,7 +142,7 @@ function drawScrollingSidewall(x, wallWidth, glyphs, color, side) {
 }
 
 function drawDeathWall(height, width, color) {
-  const y = state.world.deathWallY ?? height * 1.25;
+  const y = state.world.deathWallY ?? height * roomSettings.startHeightRatio;
   const top = Math.max(0, y);
   if (y < height) {
     context.fillStyle = color.accent;
@@ -250,7 +251,7 @@ function update(time) {
 function resetRun() {
   const { height } = canvas.getBoundingClientRect();
   state.player = { x: 0.5, y: 0.76 };
-  state.world = { scrollOffset: 0, deathWallY: height * 1.25, distance: 0 };
+  state.world = { scrollOffset: 0, deathWallY: height * roomSettings.startHeightRatio, distance: 0 };
   state.gameOver = false;
   state.paused = dialog.open || !editorPanel.hidden;
   state.keys.clear();
@@ -268,6 +269,7 @@ async function loadWorldSettings() {
     const room = settings.room || {};
     if (Number.isFinite(room.wallWidth)) roomSettings.wallWidth = room.wallWidth;
     if (Number.isFinite(room.glyphSpacing)) roomSettings.glyphSpacing = room.glyphSpacing;
+    if (Number.isFinite(settings.wallOfDeath?.startHeightRatio)) roomSettings.startHeightRatio = settings.wallOfDeath.startHeightRatio;
     if (typeof room.leftWallGlyphs === "string" && room.leftWallGlyphs.length > 0) roomSettings.leftWallGlyphs = room.leftWallGlyphs;
     if (typeof room.rightWallGlyphs === "string" && room.rightWallGlyphs.length > 0) roomSettings.rightWallGlyphs = room.rightWallGlyphs;
     draw();
@@ -473,11 +475,12 @@ function loadRun(slot) {
   if (snapshot.world && Number.isFinite(snapshot.world.scrollOffset)) {
     state.world = {
       scrollOffset: snapshot.world.scrollOffset,
-      deathWallY: Number.isFinite(snapshot.world.deathWallY) ? snapshot.world.deathWallY : canvas.getBoundingClientRect().height * 1.25,
+      deathWallY: Number.isFinite(snapshot.world.deathWallY) ? snapshot.world.deathWallY : canvas.getBoundingClientRect().height * roomSettings.startHeightRatio,
       distance: Number.isFinite(snapshot.world.distance) ? snapshot.world.distance : 0,
     };
   } else {
-    resetRun();
+    const { height } = canvas.getBoundingClientRect();
+    state.world = { scrollOffset: 0, deathWallY: height * roomSettings.startHeightRatio, distance: 0 };
   }
   state.gameOver = false;
   state.inverted = Boolean(snapshot.inverted);
@@ -586,6 +589,12 @@ window.addEventListener("keydown", (event) => {
   }
   if (dialog.open) {
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(event.key)) event.preventDefault();
+    return;
+  }
+  if (!editorPanel.hidden) return;
+  if (state.gameOver && event.key.toLowerCase() === "r") {
+    event.preventDefault();
+    resetRun();
     return;
   }
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
