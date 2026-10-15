@@ -10,10 +10,11 @@ html, body { margin: 0; min-height: 100%; background: var(--paper); color: var(-
 body { min-height: 100svh; }
 button, input { font: inherit; }
 button { color: inherit; }
-.app { min-height: 100svh; width: min(100%, 780px); margin: auto; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
-.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.app { height: 100svh; min-height: 100svh; width: min(100%, 780px); margin: auto; padding: 0; display: flex; flex-direction: column; gap: 0; }
+.topbar { position: absolute; z-index: 4; inset: 10px 12px auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--ink) 45%, transparent); background: color-mix(in srgb, var(--paper) 90%, transparent); }
 .eyebrow { margin: 0 0 4px; color: var(--accent); font-size: 11px; letter-spacing: .14em; }
-h1 { margin: 0; font-size: clamp(24px, 7vw, 42px); letter-spacing: -.06em; }
+h1 { margin: 0; font-size: clamp(20px, 4vw, 30px); letter-spacing: -.06em; }
+.control-hint { margin: 4px 0 0; font-size: clamp(7px, 1.2vw, 9px); line-height: 1.25; letter-spacing: .025em; }
 .outline-button, .primary-button, .danger-button, .icon-button, .slot-actions button {
   border: 2px solid currentColor;
   border-radius: 0;
@@ -22,7 +23,11 @@ h1 { margin: 0; font-size: clamp(24px, 7vw, 42px); letter-spacing: -.06em; }
   cursor: pointer;
 }
 .outline-button[aria-pressed="true"], .primary-button { background: var(--ink); color: var(--paper); }
-.stage { position: relative; flex: 1; min-height: 56svh; overflow: hidden; border: 2px solid var(--ink); background: var(--paper); }
+.stage { position: relative; flex: 1; min-height: 0; overflow: hidden; border: 2px solid var(--ink); background: var(--paper); }
+.game-hud { position: absolute; z-index: 3; inset: 98px 12px auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 7px 12px; padding: 7px 9px; border: 1px solid color-mix(in srgb, var(--ink) 38%, transparent); background: color-mix(in srgb, var(--paper) 88%, transparent); font-size: clamp(9px, 1.6vw, 11px); font-weight: bold; }
+.health-readout { display: inline-flex; align-items: center; gap: 6px; }
+.health-readout progress { width: clamp(54px, 12vw, 100px); height: 10px; accent-color: var(--accent); }
+#lives-readout, #score-readout, #weapon-readout { white-space: nowrap; }
 #game { position: absolute; inset: 0; display: block; width: 100%; height: 100%; aspect-ratio: auto; }
 .stage-label { position: absolute; left: 12px; bottom: 10px; padding: 4px 6px; font-size: 10px; letter-spacing: .08em; background: var(--paper); color: var(--ink); }
 footer { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; opacity: .75; }
@@ -67,8 +72,11 @@ dialog::backdrop { background: rgb(15 14 12 / 72%); }
 .danger-button { border-color: var(--accent); color: var(--accent); font-size: 11px; }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 520px) {
-  .app { padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); gap: 10px; }
-  .stage { min-height: 66svh; }
+  .topbar { inset: max(7px, env(safe-area-inset-top)) 7px auto; align-items: flex-start; gap: 6px; padding: 6px; }
+  .topbar-actions { gap: 4px; }
+  .topbar-actions .outline-button { padding: 6px 7px; font-size: 9px; }
+  .control-hint { max-width: 50vw; }
+  .game-hud { inset: 91px 7px auto; gap: 5px 8px; padding: 6px; }
   footer { flex-direction: column; }
   dialog { padding: 15px; }
   .save-slot { grid-template-columns: 1fr; }
@@ -165,6 +173,8 @@ body.editor-open .app { width: 100%; min-height: calc(100svh - 24px); margin: 0;
   .virtual-stick { width: clamp(82px, 23vw, 112px); }
 }
 
+
+.topbar-actions { flex-shrink: 0; }
 
 /* Keep the two-row kill boundary attached to the room floor. */
 .death-wall {
