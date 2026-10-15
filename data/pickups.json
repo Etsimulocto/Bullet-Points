@@ -121,5 +121,6 @@
       "durationSeconds": 10,
       "weight": 7
     }
-  ]
+  ],
+  "version": 2
 }
