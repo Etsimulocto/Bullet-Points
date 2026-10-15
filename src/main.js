@@ -659,8 +659,8 @@ function update(time) {
         (!startedInsideWall && segmentHitsObstacle(oldPx, oldPy, oldPx, nextPy, obstacle))
       );
 
-      if (!hitsVerticalPath) nextPlayerY = previousPlayerY;
-      else if (!hitsHorizontalPath) nextPlayerX = previousPlayerX;
+      if (!hitsHorizontalPath) nextPlayerY = previousPlayerY;
+      else if (!hitsVerticalPath) nextPlayerX = previousPlayerX;
       else {
         nextPlayerX = previousPlayerX;
         nextPlayerY = previousPlayerY;
