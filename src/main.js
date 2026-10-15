@@ -133,12 +133,12 @@ function deadzone(value, zone) {
 function pollGamepad() {
   if (!navigator.getGamepads) {
     input.pad = null;
-    gamepadStatus.textContent = "Gamepad API unavailable in this browser.";
+    gamepadStatus.textContent = uiText.gamepadUnsupported;
     return;
   }
   input.pad = Array.from(navigator.getGamepads() || []).find(p => p && p.connected) || null;
   const pad = input.pad, cfg = controlMap.gamepad;
-  const status = pad ? "Connected: " + pad.id : "No controller detected. Connect one, then press a button.";
+  const status = pad ? uiText.gamepadConnected.replace("{name}", pad.id || "Controller") : uiText.noGamepad;
   if (status !== lastGamepadMessage) { lastGamepadMessage = status; gamepadStatus.textContent = status; }
   if (!pad) { input.move = {x:0,y:0}; input.aim = {x:0,y:0}; return; }
   const ax = i => Number.isFinite(pad.axes[i]) ? pad.axes[i] : 0;
