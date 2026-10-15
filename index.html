@@ -43,6 +43,7 @@
     <label for="editor-file">EDIT DATA FILE</label>
     <select id="editor-file">
       <option value="../data/settings.json">Settings</option>
+      <option value="../data/controls.json">Controls</option>
       <option value="../data/weapons.json">Weapons</option>
       <option value="../data/pickups.json">Pickups</option>
       <option value="../data/enemies.json">Enemies</option>
@@ -90,13 +91,22 @@
     <section class="menu-section" aria-labelledby="controls-heading">
       <h3 id="controls-heading">CONTROLS</h3>
       <label class="choice-row">
-        <input type="radio" name="control-scheme" value="keyboard" checked>
+        <input type="radio" name="control-scheme" value="auto" checked>
+        <span id="auto-label">Auto: use any active input</span>
+      </label>
+      <label class="choice-row">
+        <input type="radio" name="control-scheme" value="keyboard">
         <span id="keyboard-label">Keyboard and mouse</span>
       </label>
       <label class="choice-row">
-        <input type="radio" name="control-scheme" value="touch">
-        <span><span id="touch-label">Dual mobile sticks</span> <small id="touch-note">(input support is planned)</small></span>
+        <input type="radio" name="control-scheme" value="gamepad">
+        <span id="gamepad-label">Gamepad</span>
       </label>
+      <label class="choice-row">
+        <input type="radio" name="control-scheme" value="touch">
+        <span><span id="touch-label">Dual mobile sticks</span> <small id="touch-note">(left moves · right aims and fires)</small></span>
+      </label>
+      <p id="gamepad-status" class="gamepad-status" role="status" aria-live="polite">Looking for a connected controller…</p>
     </section>
 
     <section class="menu-section" aria-labelledby="slots-heading">
