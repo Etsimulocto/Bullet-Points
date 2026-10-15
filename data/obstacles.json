@@ -17,7 +17,7 @@
       "health": 2,
       "breaksIntoLetters": false,
       "type": "block",
-      "size": 40,
+      "size": 60,
       "fallSpeed": 105,
       "gravity": 45,
       "slideSpeed": 210
@@ -163,7 +163,7 @@
       ],
       "blockDropHeight": 88,
       "block": {
-        "size": 40,
+        "size": 60,
         "fallSpeed": 110,
         "gravity": 42,
         "slideSpeed": 220
