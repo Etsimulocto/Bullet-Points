@@ -158,6 +158,9 @@ function cycleWeapon(direction) {
 function effectValue(effect, fallback = 1) {
   return state.effects.filter(item => item.effect === effect).reduce((value, item) => value * item.amount, fallback);
 }
+function effectTotal(effect) {
+  return state.effects.filter(item => item.effect === effect).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+}
 function sayPickup(message) {
   state.pickupMessage = message;
   state.pickupMessageTime = 2.2;
@@ -176,11 +179,12 @@ function collectPickup(pickup) {
     sayPickup(item.name + " · " + item.durationSeconds + "s");
   } else if (item.effect === "grantWeapon") {
     const locked = weaponList.filter(weapon => !state.unlockedWeapons.includes(weapon.id));
-    const weapon = item.amount === "random" ? locked[Math.floor(Math.random() * locked.length)] : weaponList.find(entry => entry.id === item.amount);
+    const options = locked.length ? locked : weaponList.filter(weapon => weapon.id !== state.weaponId);
+    const weapon = item.amount === "random" ? options[Math.floor(Math.random() * options.length)] : weaponList.find(entry => entry.id === item.amount);
     if (weapon) {
       if (!state.unlockedWeapons.includes(weapon.id)) state.unlockedWeapons.push(weapon.id);
       state.weaponId = weapon.id;
-      sayPickup("UNLOCKED · " + weapon.name);
+      sayPickup((locked.length ? "UNLOCKED · " : "WEAPON DROP · ") + weapon.name);
     } else {
       state.shields += 1;
       sayPickup("ARSENAL COMPLETE · +1 SHIELD");
@@ -191,7 +195,7 @@ function collectPickup(pickup) {
     sayPickup("MAX HP +" + item.amount);
   } else if (item.effect === "bonusDistance") {
     state.world.distance += item.amount;
-    sayPickup("PAGE SKIP · +" + item.amount + "m");
+    sayPickup("PAGE SKIP · +" + Math.round(item.amount / 10) + "m");
   } else {
     sayPickup(item.name || "PICKUP");
   }
@@ -202,7 +206,7 @@ function shootWeapon(weapon, aim, width, height) {
     state.beams.push({ x: width * state.player.x, y: height * state.player.y, angle: baseAngle, length: weapon.beamLength || 400, duration: weapon.beamDuration || 0.12, remaining: weapon.beamDuration || 0.12 });
     return;
   }
-  const count = Math.max(1, Number(weapon.projectilesPerShot) || 1) + Math.max(0, Math.floor(effectValue("extraProjectiles", 0)));
+  const count = Math.max(1, Number(weapon.projectilesPerShot) || 1) + Math.max(0, Math.floor(effectTotal("extraProjectiles")));
   const spread = (Number(weapon.spreadDegrees) || 0) * Math.PI / 180;
   const speed = Number(weapon.projectileSpeed) || 500;
   for (let i = 0; i < count; i += 1) {
