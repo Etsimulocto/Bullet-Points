@@ -14,7 +14,9 @@
         <p class="eyebrow">AN INFINITE WORD DUNGEON</p>
         <h1>Bullet Points</h1>
       </div>
-      <button id="invert-button" type="button" aria-pressed="false">Invert ink</button>
+      <button id="menu-button" class="outline-button" type="button" aria-haspopup="dialog">
+        <span aria-hidden="true">Ⅱ</span> PAUSE / SETTINGS
+      </button>
     </header>
     <section class="stage" aria-label="Game viewport">
       <canvas id="game" aria-label="Bullet Points game canvas"></canvas>
@@ -25,6 +27,56 @@
       <span>Dual mobile sticks planned</span>
     </footer>
   </main>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <div class="dialog-header">
+      <div>
+        <p class="eyebrow">RUN CONTROL</p>
+        <h2 id="settings-title">PAUSED / SETTINGS</h2>
+      </div>
+      <button id="close-menu" class="icon-button" type="button" aria-label="Resume and close settings">×</button>
+    </div>
+
+    <button id="resume-button" class="primary-button" type="button">RESUME RUN</button>
+
+    <section class="menu-section" aria-labelledby="display-heading">
+      <h3 id="display-heading">DISPLAY & SOUND</h3>
+      <div class="setting-row">
+        <span>Ink colors</span>
+        <button id="invert-button" class="outline-button" type="button" aria-pressed="false">INVERT INK: OFF</button>
+      </div>
+      <label class="setting-row" for="sound-toggle">
+        <span>Sound effects <small>(ready for audio)</small></span>
+        <input id="sound-toggle" type="checkbox" checked>
+      </label>
+    </section>
+
+    <section class="menu-section" aria-labelledby="controls-heading">
+      <h3 id="controls-heading">CONTROLS</h3>
+      <label class="choice-row">
+        <input type="radio" name="control-scheme" value="keyboard" checked>
+        <span>Keyboard and mouse</span>
+      </label>
+      <label class="choice-row">
+        <input type="radio" name="control-scheme" value="touch">
+        <span>Dual mobile sticks <small>(input support is planned)</small></span>
+      </label>
+    </section>
+
+    <section class="menu-section" aria-labelledby="slots-heading">
+      <div class="section-title-row">
+        <h3 id="slots-heading">SAVE SLOTS</h3>
+        <small>Stored in this browser</small>
+      </div>
+      <div id="save-slots" class="save-slots"></div>
+    </section>
+
+    <div class="dialog-footer">
+      <p id="menu-status" role="status" aria-live="polite"></p>
+      <button id="restart-button" class="danger-button" type="button">RESTART RUN</button>
+    </div>
+  </dialog>
+
   <script type="module" src="src/main.js"></script>
 </body>
 </html>
