@@ -233,8 +233,14 @@ function collectPickup(pickup) {
   } else if (item.effect === "addShield") {
     state.shields += item.amount;
     sayPickup(item.name + " +" + item.amount);
-  } else if (item.effect === "modifyFireRate" || item.effect === "extraProjectiles" || item.effect === "slowScroll") {
-    state.effects.push({ effect: item.effect, amount: item.amount, remaining: item.durationSeconds });
+  } else if (["modifyFireRate", "extraProjectiles", "slowScroll", "speedBoost", "radialFire", "wordWall", "clones"].includes(item.effect)) {
+    state.effects.push({
+      effect: item.effect,
+      amount: Number(item.amount) || 1,
+      remaining: Math.max(0.1, Number(item.durationSeconds) || 0),
+      intervalSeconds: Number(item.intervalSeconds) || 0.85,
+      cooldown: 0
+    });
     sayPickup(item.name + " · " + item.durationSeconds + "s");
   } else if (item.effect === "grantWeapon") {
     const locked = weaponList.filter(weapon => !state.unlockedWeapons.includes(weapon.id));
@@ -259,23 +265,51 @@ function collectPickup(pickup) {
     sayPickup(item.name || "PICKUP");
   }
 }
+function playerFormation(width, height) {
+  const copies = Math.min(2, Math.max(0, Math.floor(effectTotal("clones"))));
+  const centerX = width * state.player.x;
+  const centerY = height * state.player.y;
+  const offsets = copies === 2 ? [-24, 0, 24] : copies === 1 ? [-20, 20] : [0];
+  return offsets.map(offset => ({ x: centerX + offset, y: centerY }));
+}
+
+function fireProjectileAt(weapon, x, y, angle, speed = Number(weapon.projectileSpeed) || 500) {
+  state.projectiles.push({
+    x: x + Math.cos(angle) * 14,
+    y: y + Math.sin(angle) * 14,
+    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, angle,
+    glyph: weapon.projectileGlyph || ".", damage: Number(weapon.damage) || 1
+  });
+}
+
 function shootWeapon(weapon, aim, width, height) {
   const baseAngle = Math.atan2(aim.y, aim.x);
-  if (weapon.pattern === "beam") {
-    state.beams.push({ x: width * state.player.x, y: height * state.player.y, angle: baseAngle, length: weapon.beamLength || 400, duration: weapon.beamDuration || 0.12, remaining: weapon.beamDuration || 0.12 });
-    return;
-  }
   const count = Math.max(1, Number(weapon.projectilesPerShot) || 1) + Math.max(0, Math.floor(effectTotal("extraProjectiles")));
   const spread = (Number(weapon.spreadDegrees) || 0) * Math.PI / 180;
+  for (const origin of playerFormation(width, height)) {
+    if (weapon.pattern === "beam") {
+      state.beams.push({ x: origin.x, y: origin.y, angle: baseAngle, length: weapon.beamLength || 400, duration: weapon.beamDuration || 0.12, remaining: weapon.beamDuration || 0.12 });
+      continue;
+    }
+    for (let i = 0; i < count; i += 1) {
+      const angle = baseAngle + (count === 1 ? 0 : spread * (i / (count - 1) - 0.5));
+      fireProjectileAt(weapon, origin.x, origin.y, angle);
+    }
+  }
+}
+
+function shootRadialBurst(weapon, width, height, count) {
+  const bullets = Math.max(4, Math.min(24, Math.floor(Number(count) || 12)));
   const speed = Number(weapon.projectileSpeed) || 500;
-  for (let i = 0; i < count; i += 1) {
-    const angle = baseAngle + (count === 1 ? 0 : spread * (i / (count - 1) - 0.5));
-    state.projectiles.push({
-      x: width * state.player.x + Math.cos(angle) * 14,
-      y: height * state.player.y + Math.sin(angle) * 14,
-      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, angle,
-      glyph: weapon.projectileGlyph || ".", damage: Number(weapon.damage) || 1
-    });
+  for (const origin of playerFormation(width, height)) {
+    if (weapon.pattern === "beam") {
+      for (let i = 0; i < bullets; i += 1) {
+        const angle = Math.PI * 2 * i / bullets;
+        state.beams.push({ x: origin.x, y: origin.y, angle, length: weapon.beamLength || 400, duration: weapon.beamDuration || 0.12, remaining: weapon.beamDuration || 0.12 });
+      }
+    } else {
+      for (let i = 0; i < bullets; i += 1) fireProjectileAt(weapon, origin.x, origin.y, Math.PI * 2 * i / bullets, speed);
+    }
   }
 }
 async function loadControlMap() {
@@ -527,6 +561,7 @@ function defeatEnemy(enemy) {
 }
 
 function damagePlayer(amount) {
+  if (effectValue("wordWall", 0) > 0) return;
   const damage = Math.max(0, Number(amount) || 0);
   if (damage === 0) return;
   if (state.shields > 0) state.shields -= 1;
@@ -603,9 +638,14 @@ function updateEnemySystem(dt, width, height, scrollDelta) {
       enemy.fireCooldown = Math.max(0.25, Number(def.fireRate) || 1.6);
     }
     if (Math.hypot(enemy.x - playerX, enemy.y - playerY) < 22) {
-      damagePlayer(def.contactDamage);
-      createEnemyExplosion(enemy);
-      sayPickup("HIT BY · " + def.name);
+      if (effectValue("wordWall", 0) > 0) {
+        createEnemyExplosion(enemy);
+        defeatEnemy(enemy);
+      } else {
+        damagePlayer(def.contactDamage);
+        createEnemyExplosion(enemy);
+        sayPickup("HIT BY · " + def.name);
+      }
       return false;
     }
     return enemy.y < state.world.deathWallY + 30;
@@ -614,6 +654,9 @@ function updateEnemySystem(dt, width, height, scrollDelta) {
   state.enemyBullets = state.enemyBullets.filter(bullet => {
     bullet.x += bullet.vx * dt;
     bullet.y += bullet.vy * dt;
+    const protectedByWordWall = effectValue("wordWall", 0) > 0 &&
+      Math.abs(bullet.x - playerX) < 30 && Math.abs(bullet.y - playerY) < 26;
+    if (protectedByWordWall) return false;
     if (Math.hypot(bullet.x - playerX, bullet.y - playerY) < 14) {
       damagePlayer(bullet.damage);
       sayPickup("HIT BY · ENEMY FIRE");
@@ -760,15 +803,37 @@ function draw() {
 
   const px = width * state.player.x;
   const py = height * state.player.y;
-  context.fillStyle = color.accent;
-  context.beginPath();
-  context.arc(px, py, 10, 0, Math.PI * 2);
-  context.fill();
-  context.fillStyle = color.paper;
-  setCanvasFont(10, "bold");
-  context.textAlign = "center";
-  context.textBaseline = "alphabetic";
-  context.fillText("@", px, py + 3.5);
+  if (effectValue("wordWall", 0) > 0) {
+    context.save();
+    context.strokeStyle = color.accent;
+    context.fillStyle = color.accent;
+    context.lineWidth = 3;
+    context.setLineDash([8, 4]);
+    context.strokeRect(px - 28, py - 24, 56, 48);
+    context.setLineDash([]);
+    setCanvasFont(9, "bold");
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText("WALL", px, py - 23);
+    context.fillText("TEXT", px, py + 23);
+    context.restore();
+  }
+  const playerCount = Math.max(0, Math.floor(effectTotal("clones")));
+  const formation = playerCount ? playerFormation(width, height) : [{ x: px, y: py }];
+  formation.forEach((copy, index) => {
+    context.save();
+    context.globalAlpha = index === Math.floor(formation.length / 2) ? 1 : 0.72;
+    context.fillStyle = color.accent;
+    context.beginPath();
+    context.arc(copy.x, copy.y, 10, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = color.paper;
+    setCanvasFont(10, "bold");
+    context.textAlign = "center";
+    context.textBaseline = "alphabetic";
+    context.fillText("@", copy.x, copy.y + 3.5);
+    context.restore();
+  });
 
   state.projectiles.forEach(shot => {
     context.save();
@@ -822,8 +887,9 @@ function update(time) {
     const controls = readControls();
     const previousPlayerX = state.player.x;
     const previousPlayerY = state.player.y;
-    let nextPlayerX = state.player.x + controls.move.x * dt * 0.45;
-    let nextPlayerY = state.player.y + controls.move.y * dt * 0.45;
+    const moveScale = Math.max(0.5, Math.min(2.5, effectValue("speedBoost", 1)));
+    let nextPlayerX = state.player.x + controls.move.x * dt * 0.45 * moveScale;
+    let nextPlayerY = state.player.y + controls.move.y * dt * 0.45 * moveScale;
     if (Math.hypot(controls.aim.x, controls.aim.y) > 0.15) state.aim = controls.aim;
 
     const scrollScale = effectValue("slowScroll", 1);
@@ -847,6 +913,14 @@ function update(time) {
       shootWeapon(weapon, state.aim, width, height);
       state.fireCooldown = 1 / Math.max(0.2, (Number(weapon.shotsPerSecond) || 4) * fireRate);
     }
+    state.effects.forEach(effect => {
+      if (effect.effect !== "radialFire") return;
+      effect.cooldown = Number(effect.cooldown || 0) - dt;
+      if (effect.cooldown <= 0) {
+        shootRadialBurst(weapon, width, height, effect.amount);
+        effect.cooldown = Math.max(0.2, Number(effect.intervalSeconds) || 0.85);
+      }
+    });
     updatePlayerShots(dt, width, height);
     state.beams = state.beams.map(beam => ({ ...beam, remaining: beam.remaining - dt })).filter(beam => beam.remaining > 0);
     state.obstacles = state.obstacles.filter(obstacle => {
@@ -861,8 +935,9 @@ function update(time) {
     nextPlayerY = Math.max(minY, Math.min(maxY, nextPlayerY));
     const nextPx = nextPlayerX * width, nextPy = nextPlayerY * height;
     const oldPx = previousPlayerX * width, oldPy = previousPlayerY * height;
-    const endCollision = collidesWithObstacle(nextPx, nextPy);
-    const sweptCollision = state.obstacles.find(obstacle =>
+    const protectedByWordWall = effectValue("wordWall", 0) > 0;
+    const endCollision = protectedByWordWall ? null : collidesWithObstacle(nextPx, nextPy);
+    const sweptCollision = protectedByWordWall ? null : state.obstacles.find(obstacle =>
       segmentHitsObstacle(oldPx, oldPy, nextPx, nextPy, obstacle)
     );
 
