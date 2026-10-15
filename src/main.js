@@ -607,7 +607,8 @@ function update(time) {
 
     const scrollScale = effectValue("slowScroll", 1);
     const scrollStep = roomSettings.scrollSpeed * scrollScale;
-    state.world.scrollOffset += dt * scrollStep;
+    const scrollDelta = dt * scrollStep;
+    state.world.scrollOffset += scrollDelta;
     const previousDepth = Math.floor(state.world.distance / 10);
     state.world.distance += dt * scrollStep;
     state.score += Math.floor(state.world.distance / 10) - previousDepth;
@@ -644,29 +645,29 @@ function update(time) {
     nextPlayerY = Math.max(minY, Math.min(maxY, nextPlayerY));
     const nextPx = nextPlayerX * width, nextPy = nextPlayerY * height;
     const oldPx = previousPlayerX * width, oldPy = previousPlayerY * height;
-    const startedInsideWall = state.obstacles.some(obstacle =>
-      obstacleContainsPoint(oldPx, oldPy, obstacle, obstacle.previousY ?? obstacle.y)
-    );
     const endCollision = collidesWithObstacle(nextPx, nextPy);
-    const sweptCollision = !startedInsideWall && state.obstacles.find(obstacle =>
+    const sweptCollision = state.obstacles.find(obstacle =>
       segmentHitsObstacle(oldPx, oldPy, nextPx, nextPy, obstacle)
     );
 
     if (endCollision || sweptCollision) {
       const hitsHorizontalPath = state.obstacles.some(obstacle =>
         collidesWithObstacle(nextPx, oldPy) === obstacle ||
-        (!startedInsideWall && segmentHitsObstacle(oldPx, oldPy, nextPx, oldPy, obstacle))
+        segmentHitsObstacle(oldPx, oldPy, nextPx, oldPy, obstacle)
       );
       const hitsVerticalPath = state.obstacles.some(obstacle =>
         collidesWithObstacle(oldPx, nextPy) === obstacle ||
-        (!startedInsideWall && segmentHitsObstacle(oldPx, oldPy, oldPx, nextPy, obstacle))
+        segmentHitsObstacle(oldPx, oldPy, oldPx, nextPy, obstacle)
       );
 
-      if (!hitsHorizontalPath) nextPlayerY = previousPlayerY;
-      else if (!hitsVerticalPath) nextPlayerX = previousPlayerX;
-      else {
+      const scrollCarry = scrollDelta / height;
+      if (!hitsHorizontalPath) {
+        nextPlayerY = Math.max(minY, Math.min(maxY, previousPlayerY + scrollCarry));
+      } else if (!hitsVerticalPath) {
         nextPlayerX = previousPlayerX;
-        nextPlayerY = previousPlayerY;
+      } else {
+        nextPlayerX = previousPlayerX;
+        nextPlayerY = Math.max(minY, Math.min(maxY, previousPlayerY + scrollCarry));
       }
     }
     state.player.x = nextPlayerX;
