@@ -7,7 +7,6 @@
   },
   "world": {
     "scrollSpeed": 42,
-    "killWallSpeed": 65,
     "spawnInterval": 1.4
   },
   "player": {
@@ -27,6 +26,10 @@
   "wallOfDeath": {
     "label": "WALL OF DEATH",
     "hitText": "ERASED",
-    "startHeightRatio": 1.25
+    "height": 44,
+    "lines": [
+      "WALL OF DEATH",
+      "NO ESCAPE"
+    ]
   }
 }
