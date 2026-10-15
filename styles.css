@@ -278,3 +278,33 @@ body.editor-open .app { width: 100%; min-height: calc(100svh - 24px); margin: 0;
   .death-wall .control-hint { font-size: 9px; }
   .death-wall-warning { min-height: 48px; font-size: clamp(17px, 4.5vw, 24px); }
 }
+
+/* A-to-Z enemy tuning controls */
+.editor-panel { overflow-y: auto; }
+.enemy-tuner {
+  max-height: 58svh;
+  overflow: auto;
+  padding: 10px;
+  border: 2px solid var(--ink);
+  background: color-mix(in srgb, var(--accent) 8%, var(--paper));
+}
+.enemy-tuner[hidden] { display: none; }
+.enemy-tuner h3 { margin: 0 0 8px; font-size: 14px; letter-spacing: .08em; }
+.enemy-tuner > label { display: block; margin: 7px 0 4px; font-size: 10px; font-weight: bold; }
+.enemy-tuner > select { width: 100%; padding: 7px; }
+.enemy-preview { display: flex; align-items: center; gap: 10px; min-height: 58px; margin: 8px 0; padding: 6px 10px; border: 1px solid var(--ink); background: var(--ink); }
+#enemy-preview-letter { font-size: 38px; font-weight: 900; line-height: 1; }
+#enemy-preview-name { overflow: hidden; color: var(--paper); font-size: 12px; text-overflow: ellipsis; }
+.enemy-tuner-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.enemy-tuner-section { grid-column: 1 / -1; margin: 8px 0 0; padding-bottom: 4px; border-bottom: 1px solid color-mix(in srgb, var(--ink) 32%, transparent); font-size: 10px; letter-spacing: .08em; }
+.enemy-tuner-field { display: flex; flex-direction: column; justify-content: space-between; gap: 4px; min-width: 0; font-size: 9px; font-weight: bold; }
+.enemy-tuner-field input:not([type="checkbox"]), .enemy-tuner-field select { width: 100%; min-width: 0; min-height: 30px; padding: 4px; border: 1px solid var(--ink); border-radius: 0; background: var(--paper); color: var(--ink); font: inherit; }
+.enemy-tuner-field input[type="color"] { padding: 2px; }
+.enemy-tuner-field input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); }
+.explosion-preview-wrap { margin-top: 9px; padding-top: 7px; border-top: 1px solid var(--ink); }
+.explosion-preview-wrap small { font-size: 9px; font-weight: bold; }
+.explosion-preview { overflow-wrap: anywhere; min-height: 32px; padding: 5px 0; font-size: 16px; font-weight: 900; letter-spacing: .12em; }
+.enemy-tuner-help { margin: 5px 0 0; font-size: 9px; line-height: 1.4; }
+@media (max-width: 520px) {
+  .enemy-tuner-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
