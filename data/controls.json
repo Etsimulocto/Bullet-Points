@@ -48,10 +48,16 @@
       "x": 2,
       "y": 3
     },
+    "rightStickFires": true,
+    "rightStickFireThreshold": 0.24,
     "fireButtons": [
       0,
       7
     ],
+    "menuButton": 9,
+    "editorButton": 8,
+    "backButton": 1,
+    "activateButton": 0,
     "dpad": {
       "up": 12,
       "down": 13,
