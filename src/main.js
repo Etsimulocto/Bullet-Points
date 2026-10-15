@@ -295,7 +295,7 @@ function shootWeapon(weapon, aim, width, height) {
   const spread = (Number(weapon.spreadDegrees) || 0) * Math.PI / 180;
   for (const origin of playerFormation(width, height)) {
     if (weapon.pattern === "beam") {
-      state.beams.push({ x: origin.x, y: origin.y, angle: baseAngle, length: weapon.beamLength || 400, duration: weapon.beamDuration || 0.12, remaining: weapon.beamDuration || 0.12 });
+      state.beams.push({ x: origin.x, y: origin.y, angle: baseAngle, length: weapon.beamLength || 400, duration: weapon.beamDuration || 0.12, remaining: weapon.beamDuration || 0.12, damage: Math.max(1, Number(weapon.damage) || 1), hitEnemies: [] });
       continue;
     }
     for (let i = 0; i < count; i += 1) {
@@ -312,7 +312,7 @@ function shootRadialBurst(weapon, width, height, count) {
     if (weapon.pattern === "beam") {
       for (let i = 0; i < bullets; i += 1) {
         const angle = Math.PI * 2 * i / bullets;
-        state.beams.push({ x: origin.x, y: origin.y, angle, length: weapon.beamLength || 400, duration: weapon.beamDuration || 0.12, remaining: weapon.beamDuration || 0.12 });
+        state.beams.push({ x: origin.x, y: origin.y, angle, length: weapon.beamLength || 400, duration: weapon.beamDuration || 0.12, remaining: weapon.beamDuration || 0.12, damage: Math.max(1, Number(weapon.damage) || 1), hitEnemies: [] });
       }
     } else {
       for (let i = 0; i < bullets; i += 1) fireProjectileAt(weapon, origin.x, origin.y, Math.PI * 2 * i / bullets, speed);
@@ -701,6 +701,31 @@ function updatePlayerShots(dt, width, height) {
   state.projectiles = remaining;
 }
 
+function distanceToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lengthSquared = dx * dx + dy * dy;
+  const t = lengthSquared ? Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lengthSquared)) : 0;
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+function updateBeamHits() {
+  for (const beam of state.beams) {
+    if (!Array.isArray(beam.hitEnemies)) beam.hitEnemies = [];
+    const endX = beam.x + Math.cos(beam.angle) * beam.length;
+    const endY = beam.y + Math.sin(beam.angle) * beam.length;
+    state.enemies = state.enemies.filter(enemy => {
+      if (beam.hitEnemies.includes(enemy) || distanceToSegment(enemy.x, enemy.y, beam.x, beam.y, endX, endY) > 17) return true;
+      beam.hitEnemies.push(enemy);
+      enemy.health -= Math.max(1, Number(beam.damage) || 1);
+      if (enemy.health <= 0) {
+        defeatEnemy(enemy);
+        return false;
+      }
+      return true;
+    });
+  }
+}
+
 function loseLife() {
   state.lives = Math.max(0, state.lives - 1);
   state.enemyBullets = [];
@@ -930,6 +955,7 @@ function update(time) {
     });
     updatePlayerShots(dt, width, height);
     state.beams = state.beams.map(beam => ({ ...beam, remaining: beam.remaining - dt })).filter(beam => beam.remaining > 0);
+    updateBeamHits();
     state.obstacles = state.obstacles.filter(obstacle => {
       obstacle.previousY = obstacle.y;
       obstacle.y += dt * scrollStep;
